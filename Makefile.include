@@ -22,4 +22,4 @@ flash: $(PROGNAME).elf
 	$(FLASHPROG) $(FLASHFLAGS) -U flash:w:$(PROGNAME).elf
 
 %.elf : $(OBJECTS)
-	$(CC) $(CFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) -o $@ $(OBJECTS)
