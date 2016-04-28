@@ -2,16 +2,27 @@
 #include <util/delay.h>
 
 #include "motor.h"
-
+#include "buttons.h"
 
 int main (void)
 {
   motor_init();
-
+  buttons_init();
 
   for (;;) {
-    motor_1_set(255);
-    motor_2_set(255);
-    _delay_ms(2000);
+    
+    if (button_play_pressed()) {
+      motor_1_set(60);
+      motor_2_set(60);
+
+      _delay_ms(200);
+    }
+
+    if (button_pwr_pressed()) {
+      motor_1_set(-60);
+      motor_2_set(-60);
+
+      _delay_ms(200);
+    }
   }
 }
