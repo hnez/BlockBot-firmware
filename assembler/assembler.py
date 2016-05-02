@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 import sys #TODO: Change x,y
 labels = {}
-
+debug = False
 
 def parse(text):
-  print 'Parsing ...'
+  print 'Parsing...'
 
 
   def splitline(line):#-------------------------------------------
@@ -81,22 +81,28 @@ def parse(text):
 
 
 def xycompile(ops):
-    opcodes = {'NOP':0x00, 'LD':0x04,
+    opcodes =  {'RESERVED':0x00,
+                'JIF':0x01,'JIB':0x03,
+                'LDI':0x03,
 
+                'LD':0x04, 'SLZ':0x08,
 
-               'INC':0x10, 'DEC':0x14,
-               'NOT':0x08,
+                'SOV':0xC, 'SKP':0xD,
+                'SKD':0xE, 'SKJ':0xF,
 
-               'JFW':0x20,'JBW':0x30,
+                'DEC':0x10, 'INC':0x14,
+                'NOT':0x18, 'SRR':0x1C,
 
-               'LDA':0x40,'STA':0x60,
+                'JFW':0x20,'JBW':0x30,
 
-               'MOV': 0x80,'OR' :0x90,
-               'AND': 0xA0,'XOR': 0xB0,
+                'LDA':0x40,'STA':0x60,
 
-               'ADD':0xC0,'SUB':0xD0,
-               'SEQ': 0xE0,'SNE':0xF0,
-               0:0} #if no opcode
+                'MOV': 0x80,'OR' :0x90,
+                'AND': 0xA0,'XOR': 0xB0,
+
+                'ADD':0xC0,'SUB':0xD0,
+                'SEQ': 0xE0,'SNE':0xF0,
+                0:0} #if no opcode
 
     registers = {'RZ':0x00, 'RA':0x01,
                  'RB':0x02, 'RC':0x03}
@@ -129,10 +135,13 @@ def xycompile(ops):
 
       return args[0], args[1]
 #---------------------------------------------------
+    global debug
     output = bytearray()
     ops = [alias(op) for op in ops]
 
-    print 'Assembling ...'
+    print 'Assembling...'
+    if debug:
+        print'-----------------------------------------------'
 
     for i, op in enumerate(ops):
       if op['o'] != 'LABEL':#------------------
@@ -160,41 +169,67 @@ def xycompile(ops):
       #translation of the jump labels
       ops[i]['p']=len(output)
       output.append(byte)
+
+
+      if debug:
+          print op
+          print bin(byte)
+          print'-----------------------------------------------'
+          ops[i]['byte'] = byte
 #---------------------------------------------------------------------
 
     print ("Linking...")
+    if debug:
+        print'-----------------------------------------------'
+
     for op in ops:
       if op['o'] in ('JFW','JBW'): #linking
         for label in ops:
           if 'l' in label:
             if label['l'] == op['a1']:
 
-              output[op['p']] |= op['p'] - label['p']
-              break
+                if debug:
+                    print op
+                    print label
+                    print'-----------------------------------------------'
 
-    for a in output:
-        print bin(a)
+                output[op['p']] |= abs(op['p'] - label['p'])
+                break
+
     return (output)
 
 
-def alias(cmd):
-    if 'o' in cmd:
-        if cmd['o']=='NEG':
-            cmd['a2'] = cmd['a1']
-            cmd['a1'] = 'RZ'
-            cmd['o'] = 'SUB'
-    return cmd
+def alias(op):
+    if 'o' in op:
+        if op['o'] == 'NEG':
+            op['a2'] = op['a1']
+            op['a1'] = 'RZ'
+            op['o'] = 'SUB'
+        if op['o'] == 'SRL':
+            op['a2'] = op['a1']
+            op['o'] = 'ADD'
+        if op['o'] == 'NOP':
+            op['a1'] = 'RZ'
+            op['a2'] = 'RZ'
+            op['o'] = 'SNE'
+    return op
 
 def main (argv):
-    if (len(argv) != 3):
-      print ('{} in.x out.y'.format(argv[0]))
+    if (len(argv) not in (3,4)):
+      print ('{} in.x out.y [-debug]'.format(argv[0]))
       exit(1)
+    if len(argv) == 4:
+        if argv[3] == '-debug':
+            global debug
+            debug = True
+            print 'Debugging is turned on...'
+
 
     with open(argv[1], 'r') as i:
         instr = i.read()
 
-    CMDs = parse(instr)
-    machinecode = xycompile(CMDs)
+    ops = parse(instr)
+    machinecode = xycompile(ops)
 
     print 'Writing Output...'
     with open(argv[2], 'wb') as o:
