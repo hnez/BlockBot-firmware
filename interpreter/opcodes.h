@@ -7,4 +7,4 @@
 
 typedef uint8_t (*op_cb_t)(uint8_t);
 
-extern PROGMEM const op_cb_t op_opmap[16];
+extern const op_cb_t op_opmap[16];

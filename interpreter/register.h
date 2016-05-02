@@ -1,5 +1,6 @@
 #pragma once
 
+#include "vm.h"
 
 #define REG_OK 1
 #define REG_ERR 0

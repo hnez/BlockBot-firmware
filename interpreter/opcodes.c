@@ -1,3 +1,6 @@
+#include <avr/io.h>
+#include <avr/pgmspace.h>
+
 #include "opcodes.h"
 #include "memory.h"
 #include "register.h"
@@ -11,7 +14,7 @@
 #define op_dec_mema(o) ((o&0x1c) >> 2)
 
 static uint8_t op_short(uint8_t);
-static uint8_t op_immediate(uint8_t);
+static uint8_t op_unary(uint8_t);
 static uint8_t op_jfw(uint8_t);
 static uint8_t op_jbw(uint8_t);
 
@@ -32,7 +35,7 @@ static uint8_t op_sne(uint8_t);
 
 PROGMEM const op_cb_t op_opmap[16]= {
   op_short,
-  op_immediate,
+  op_unary,
   op_jfw,
   op_jbw,
 
@@ -70,7 +73,7 @@ static uint8_t op_short (uint8_t op)
       // Decode register number
       // Store register value and pass through the error status
       
-      return (reg_set(op_dec_reg(op), vm_next_op()));
+      return (reg_set(op_dec_reg(op), 0, vm_next_op()));
     }
     else {
       // There is no byte to read
@@ -86,24 +89,24 @@ static uint8_t op_short (uint8_t op)
   }
 }
 
-static uint8_t op_immediate (uint8_t op)
+static uint8_t op_unary (uint8_t op)
 {
   register uint8_t regnum= op_dec_reg(op);
   register uint8_t value= reg_get(regnum); 
   
   switch (op & 0xfc) {
   case (0x10): // DEC
-    return(reg_set(regnum, 0 , val-1));
+    return(reg_set(regnum, 0 , value-1));
 
     break;
 
   case (0x14): // INC
-    return(reg_set(regnum, 0 , val+1));
+    return(reg_set(regnum, 0 , value+1));
 
     break;
 
   case (0x18): // NOT
-    return(reg_set(regnum, 0 , ~val));
+    return(reg_set(regnum, 0 , ~value));
 
     break;
 
@@ -129,7 +132,7 @@ static uint8_t op_lda (uint8_t op)
 {
   register uint8_t val= mem_get(op_dec_mema(op));
 
-  return (reg_set(op_dec_reg(op), 0 val));
+  return (reg_set(op_dec_reg(op), 0, val));
 }
 
 static uint8_t op_sta (uint8_t op)
@@ -211,7 +214,7 @@ static uint8_t op_seq (uint8_t op)
   }
 }
 
-static uint8_t op_snq (uint8_t op)
+static uint8_t op_sne (uint8_t op)
 {
   register uint8_t vala= reg_get(op_dec_rega(op));
   register uint8_t valb= reg_get(op_dec_regb(op));

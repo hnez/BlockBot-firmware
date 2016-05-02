@@ -1,5 +1,8 @@
 #pragma once
 
+#include <avr/io.h>
+#include <avr/pgmspace.h>
+
 #define VM_ERR 0
 #define VM_OK 1
 
@@ -31,13 +34,15 @@ inline uint8_t vm_verify_jmp (uint8_t dir, uint16_t len)
 
 inline uint8_t vm_do_jmp (uint8_t dir, uint16_t len)
 {
-  if (vm_verify_jmp(dir, jmp) == VM_OK) {
+  if (vm_verify_jmp(dir, len) == VM_OK) {
     if (dir == VM_JMP_BWD) {
       vm_status.pc -= len;
     }
     else {
       vm_status.pc += len;
     }
+
+    return (VM_OK);
   }
   else {
     return (VM_ERR);
