@@ -9,7 +9,7 @@ uint8_t vm_step (void)
     uint8_t op= vm_next_op();
 
     // "ISO C forbids conversion of object pointer to function pointer type"
-    // op_cb_t cb= (op_cb_t)pgm_read_ptr(&op_opmap[op_dec_mayor(op)]);
+    //  op_cb_t cb= (op_cb_t)pgm_read_ptr(&op_opmap[op_dec_mayor(op)]);
     // This workaround does not feel quite right:
     op_cb_t cb= (op_cb_t)pgm_read_word(&op_opmap[op_dec_mayor(op)]);
 

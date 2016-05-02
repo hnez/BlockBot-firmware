@@ -1,5 +1,7 @@
 #pragma once
 
+#include <avr/io.h>
+
 #define OP_OK 1
 #define OP_ERR 0
 
