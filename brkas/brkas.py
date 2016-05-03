@@ -9,7 +9,7 @@ class DecodeExeCollection(Exception):
 
     def append(self, exception):
         self.errors.append(exception)
-    
+
     def __str__(self):
         errs= 'Error parsing line {} '.format(self.linenum)
         errs+='see below for errors the separate parsing modules produced\n'
@@ -18,7 +18,7 @@ class DecodeExeCollection(Exception):
 
         return (errs)
 
-    
+
 class CmdConstant (ProtoConstant):
     def parse(self, line):
         try:
@@ -40,7 +40,7 @@ class Program(object):
         CmdLabel,
         CmdConstant
     ]
-    
+
     def __init__(self):
         self.labels={}
         self.ops=[]
@@ -66,9 +66,9 @@ class Program(object):
 
     def _decode_line(self, line):
         linenum, ln= line
-        
+
         exe= DecodeExeCollection(linenum)
-        
+
         for dc in self.decoders:
             try:
                 return (dc(self, ln))
@@ -76,7 +76,7 @@ class Program(object):
                 exe.append(e)
 
         raise exe
-    
+
     def from_text(self, text):
         lines= self._lines_from_text(text)
 
@@ -93,7 +93,7 @@ class Program(object):
         fd.close()
 
         self.from_text(text)
-        
+
     def from_bytecode(self, bc):
         pass
 

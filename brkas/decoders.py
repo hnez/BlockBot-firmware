@@ -1,7 +1,7 @@
 class DEException(Exception):
     def __init__(self, quality, text):
         super(DEException, self).__init__('({})'.format(quality), text)
-        
+
         self.quality= quality
         self.text= text
 
@@ -145,7 +145,7 @@ class ProtoJumps(ProtoBase):
         if self.jump not in self.program.labels:
             text= 'label {} could not be found'.format(self.jump)
             raise EncodeException('high', text)
-        
+
         label= self.program.labels[self.jump]
 
         direction, length= label.get_offset(self.position)
@@ -153,14 +153,14 @@ class ProtoJumps(ProtoBase):
         if (direction != self.direction):
             dmap= {'pos': 'is not behind the current position',
                    'neg': 'is not before the current position'}
-            
+
             text= '{} selected but {} {}'.format(self.mnemonic, self.jump, dmap[self.direction])
             raise EncodeException('high', text)
 
         if (length > 16):
             text= 'label {} is {} bytes away but jumps can only span 16 bytes'
-            raise EncodeException('high', text.format(self.jump, length))            
-        
+            raise EncodeException('high', text.format(self.jump, length))
+
         return bytes([self.opcode | (length-1)])
 
     def __str__(self):
@@ -227,7 +227,7 @@ class ProtoMemReg (ProtoBase):
 
     def __str__(self):
         return '{} {} {}'.format(self.mnemonic, self.memaddr, self.reg)
-    
+
 class ProtoConstant(ProtoBase):
     def __init__(self, program, line):
         if isinstance(line, bytes):
@@ -237,13 +237,13 @@ class ProtoConstant(ProtoBase):
         if isinstance(line, str):
             self.value= self.parse(line)
 
-    def __bytes__(self):        
+    def __bytes__(self):
         return bytes([self.value])
 
     def __str__(self):
         return hex(self.value)
 
-    
+
 class ProtoAlias(ProtoBase):
     def __init__ (self, program, line):
         if not isinstance(line, str):
@@ -252,11 +252,11 @@ class ProtoAlias(ProtoBase):
         sln= line.split()
         frm= self.alfrom.split(' ')
         to= self.alto.split(' ')
-        
+
         if (frm[0] != sln[0]):
             text= '{} is not an alias for {}'.format(sln[0], frm[0])
             raise DecodeException('low', text)
-            
+
         if len(frm) != len(sln):
             text= 'Alias {} expects {} arguments but got {}'
             text= text.format(frm[0], len(frm), len(sln))
@@ -269,7 +269,7 @@ class ProtoAlias(ProtoBase):
 
         cmd= ' '.join(parms[tk] if tk in parms else tk for tk in to)
 
-        super(ProtoAlias, self).__init__(program, cmd)        
+        super(ProtoAlias, self).__init__(program, cmd)
 
 class CmdLabel (ProtoBase):
     def __init__(self, program, line):
@@ -278,7 +278,7 @@ class CmdLabel (ProtoBase):
                 self.label= line.split(':')[0]
                 self.program= program
                 program.labels[self.label]=self
-                
+
                 return
 
         raise DecodeException('low', 'line is not a label')
@@ -290,14 +290,14 @@ class CmdLabel (ProtoBase):
 
     def __len__(self):
         return 0
-    
+
     def __bytes__(self):
         return bytes([])
 
     def __str__(self):
         return self.label + ':'
 
-    
+
 class CmdSOV (ProtoNoOperand):
     description= 'Skip if last arithmetic instruction generated an over- or underflow'
     opcode= 0b00000100
