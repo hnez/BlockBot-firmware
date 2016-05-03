@@ -228,6 +228,73 @@ class ProtoMemReg (ProtoBase):
     def __str__(self):
         return '{} {} {}'.format(self.mnemonic, self.memaddr, self.reg)
 
+class ProtoCmd (ProtoBase):
+    def cmdtype(self):
+        pt= self.prototype.split(' ')
+
+        if len(pt) == 1:
+            return 'NoArgs'
+
+        if len(pt) == 2:
+            if pt[1] == 'XX':
+                return 'SingleReg'
+
+            if pt[1] == 'NNNN':
+                return 'Jump'
+
+        if len(pt) == 3:
+            if pt[1] == 'XX' and pt[2] == 'YY':
+                return 'TwoRegs'
+
+            if pt[1] == 'NNN' and pt[2] == 'XX':
+                return 'RegMem'
+
+        text= 'Prototype "{}" has unkown type'.format(self.prototype)
+        raise DecodeException('high', text)
+
+    def opcodemask(self):
+        masks= {'NoArgs': 0xff,
+                'SingleReg': 0xfc,
+                'Jump': 0xf0,
+                'TwoRegs': 0xf0,
+                'RegMem': 0xe0}
+
+        return masks[self.cmdtype]
+
+    def match_prototype(self, line):
+        sln= line.split(' ')
+        pt= self.prototype.split(' ')
+
+        if (sln[0].upper() != pt[0]):
+            text= '{} does not match {}'.format(sln[0], pt[0])
+            raise DecodeException('low', text)
+
+        if (sln[0] != pt[0]):
+            text= '{} does not match {}. Please note, that brkas is case sensitve.'
+            text+= 'use {} instead of {}'
+            text=text.format(sln[0], pt[0], sln[0].upper(), sln[0])
+            raise DecodeException('high', text)
+
+        if len(sln) != len(pt):
+            text= 'You supplied {} arguments but {} expects {} ({})'
+            text= text.format(len(sln)-1, pt[0] ,len(pt)-1, self.prototype)
+
+            raise DecodeException('high', text)
+
+        parms= {(tk, sln[pos]) for (pos, tk) in enumerate(pt)}
+
+        return (parms)
+
+    def __init__(self, program, line):
+        if isinstance(line, int):
+            if (line & self.opcodemask() == self.opcode):
+                self.instruction= line
+                return
+
+        if isinstance(line, str):
+            self.match_prototype(line)
+
+
 class ProtoConstant(ProtoBase):
     def __init__(self, program, line):
         if isinstance(line, bytes):
@@ -298,112 +365,112 @@ class CmdLabel (ProtoBase):
         return self.label + ':'
 
 
-class CmdSOV (ProtoNoOperand):
+class CmdSOV (ProtoCmd):
     description= 'Skip if last arithmetic instruction generated an over- or underflow'
     opcode= 0b00000100
-    mnemonic= 'SOV'
+    prototype= 'SOV'
 
-class CmdSPU (ProtoNoOperand):
+class CmdSPU (ProtoCmd):
     description= 'Push current PC and RC to stack'
     opcode=0b000000101
-    mnemonic= 'SPU'
+    prototype= 'SPU'
 
-class CmdSPO (ProtoNoOperand):
+class CmdSPO (ProtoCmd):
     description= 'Pop RC and fill PC buffer from stack'
     opcode=0b000000110
-    mnemonic= 'SPO'
+    prototype= 'SPO'
 
-class CmdSPJ (ProtoNoOperand):
+class CmdSPJ (ProtoCmd):
     description= 'Perform the jump in the PC buffer'
     opcode=0b000000111
-    mnemonic= 'SPJ'
+    prototype= 'SPJ'
 
-class CmdLD (ProtoSingleRegister):
+class CmdLD (ProtoCmd):
     description= 'Load next Byte into register XX and skip execution over it'
     opcode=0b00001000
-    mnemonic= 'LD'
+    prototype= 'LD XX'
 
-class CmdDEC (ProtoSingleRegister):
+class CmdDEC (ProtoCmd):
     description= 'Decrement register XX by one'
     opcode=0b00010000
-    mnemonic= 'DEC'
+    prototype= 'DEC XX'
 
-class CmdINC (ProtoSingleRegister):
+class CmdINC (ProtoCmd):
     description= 'Increment register XX by one'
     opcode=0b00010100
-    mnemonic= 'INC'
+    prototype= 'INC XX'
 
-class CmdNOT (ProtoSingleRegister):
+class CmdNOT (ProtoCmd):
     description= 'Bitwise NOT of Register XX'
     opcode=0b00011000
-    mnemonic= 'NOT'
+    prototype= 'NOT XX'
 
-class CmdSRR (ProtoSingleRegister):
+class CmdSRR (ProtoCmd):
     description= 'Shift register right by one bit'
     opcode=0b00011100
-    mnemonic= 'SRR'
+    prototype= 'SRR XX'
 
-class CmdJFW (ProtoJumps):
+class CmdJFW (ProtoCmd):
     description= 'Jump forward NNNN instructions'
     opcode=0b00100000
-    mnemonic= 'JFW'
+    prototype= 'JFW NNNN'
     direction= 'pos'
 
-class CmdJBW (ProtoJumps):
+class CmdJBW (ProtoCmd):
     description= 'Jump backwards NNNN instructions'
     opcode=0b00110000
-    mnemonic= 'JBW'
+    prototype= 'JBW NNNN'
     direction= 'neg'
 
-class CmdMOV (ProtoTwoRegisters):
+class CmdMOV (ProtoCmd):
     description= 'Copy register content of YY to XX'
     opcode=0b01000000
-    mnemonic= 'MOV'
+    prototype= 'MOV XX YY'
 
-class CmdOR (ProtoTwoRegisters):
+class CmdOR (ProtoCmd):
     description= 'Store logic or of XX and YY in XX'
     opcode=0b01010000
-    mnemonic= 'OR'
+    prototype= 'OR XX YY'
 
-class CmdAND (ProtoTwoRegisters):
+class CmdAND (ProtoCmd):
     description= 'Store logic and of XX and YY in XX'
     opcode=0b01100000
-    mnemonic= 'AND'
+    prototype= 'AND XX YY'
 
-class CmdXOR (ProtoTwoRegisters):
+class CmdXOR (ProtoCmd):
     description= 'Store logic exclusive or of XX and YY in XX'
     opcode=0b01110000
-    mnemonic= 'XOR'
+    prototype= 'XOR XX YY'
 
-class CmdADD (ProtoTwoRegisters):
+class CmdADD (ProtoCmd):
     description= 'Store sum of XX and YY in XX'
     opcode=0b10000000
-    mnemonic= 'ADD'
+    prototype= 'ADD XX YY'
 
-class CmdSUB (ProtoTwoRegisters):
+class CmdSUB (ProtoCmd):
     description= 'Store difference of XX and YY in XX'
     opcode=0b10010000
-    mnemonic= 'SUB'
+    prototype= 'SUB XX YY'
 
-class CmdSEQ (ProtoTwoRegisters):
+class CmdSEQ (ProtoCmd):
     description= 'Skip next instruction if equal'
     opcode=0b10100000
-    mnemonic= 'SEQ'
+    prototype= 'SEQ XX YY'
 
-class CmdSNE (ProtoTwoRegisters):
+class CmdSNE (ProtoCmd):
     description= 'Skip next instruction if not equal'
     opcode=0b10110000
-    mnemonic= 'SNE'
+    prototype= 'SNE SS YY'
 
-class CmdLDA (ProtoMemReg):
+class CmdLDA (ProtoCmd):
     description= 'Load io address NNN into register XX'
     opcode=0b1100000
-    mnemonic= 'LDA'
+    prototype= 'LDA NNN XX'
 
-class CmdSTA (ProtoMemReg):
+class CmdSTA (ProtoCmd):
     description= 'Store Register XX into io address NNN'
     opcode=0b1110000
-    mnemonic= 'STA'
+    prototype= 'STA NNN XX'
 
 class AliasNEG (ProtoAlias, CmdSUB):
     description= 'Gives the 2-complement of a number'
@@ -419,3 +486,11 @@ class AliasSRL (ProtoAlias, CmdADD):
     description= 'Shift register left by one bit'
     alfrom= 'SRL XX'
     alto= 'ADD XX XX'
+
+class CmdConstant (ProtoConstant):
+    def parse(self, line):
+        try:
+            return int(line, base=0)
+        except ValueError:
+            errtxt= '{} is not a number'.format(line)
+            raise DecodeException('low', errtxt)

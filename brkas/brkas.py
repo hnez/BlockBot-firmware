@@ -18,15 +18,6 @@ class DecodeExeCollection(Exception):
 
         return (errs)
 
-
-class CmdConstant (ProtoConstant):
-    def parse(self, line):
-        try:
-            return int(line, base=0)
-        except ValueError:
-            errtxt= '{} is not a number'.format(line)
-            raise DecodeException('low', errtxt)
-
 class Program(object):
     decoders= [
         CmdSOV, CmdSPU, CmdSPO, CmdSPJ,
