@@ -88,14 +88,21 @@ class Program(object):
     def from_bytecode(self, bc):
         pass
 
+    @classmethod
+    def to_specification(cls):
+        ops= filter(lambda o: getattr(o, 'opcode', False), cls.decoders)
+        ops= sorted(ops, key= lambda a: a.opcode)
+
+        spec= ops[0].specfmt.format('Instr bits', 'Name', 'Description') + '\n'
+        spec+= '\n'.join(map(lambda o: o.specification_line(), ops))
+
+        return (spec)
+    
     def to_text(self):
         return ('\n'.join(map(str, self.ops)))
 
     def to_bytecode(self):
-        bc= bytes()
-
-        for op in self.ops:
-            bc+=bytes(op)
+        bc= bytes(map(int, self.ops))
 
         return bc
 

@@ -69,166 +69,18 @@ class ProtoBase(object):
     def place(self, position):
         self.position= position
 
-class ProtoNoOperand(ProtoBase):
-    def __init__(self, program, line):
-        if isinstance(line, bytes):
-            if line == self.opcode:
-                return
-
-        if isinstance(line, str):
-            if line == self.mnemonic:
-                return
-
-        raise (DecodeException('low',
-                               'Does not match {}'.format(self.mnemonic)))
-
-    def __bytes__(self):
-        return bytes(self.opcode)
-
-    def __str__(self):
-        return self.mnemonic
-
-class ProtoSingleRegister(ProtoBase):
-    def __init__(self, program, line):
-        if isinstance(line, bytes):
-            if (line[0] & 0xfc) == self.opcode:
-                self.inst= line
-                return
-
-        if isinstance(line, str):
-            sln= line.split(' ')
-
-            if sln[0] == self.mnemonic:
-                if (len(sln) != 2):
-                    errtxt= '{} expects one register as argument. But got {}'
-                    errtext= errtxt.format(self.mnemonic, len(sln))
-
-                    raise (DecodeException('medium', errtxt))
-
-                self.reg= Register(sln[1])
-
-                return
-
-        raise (DecodeException('low',
-                               'Does not match {}'.format(self.mnemonic)))
-
-    def __bytes__(self):
-        return bytes([self.opcode | int(self.reg)])
-
-    def __str__(self):
-        return '{} {}'.format(self.mnemonic, self.reg)
-
-class ProtoJumps(ProtoBase):
-    def __init__(self, program, line):
-        if isinstance(line, bytes):
-            if (line[0] & 0xf0) == self.opcode:
-                self.inst= line
-                return
-
-        if isinstance(line, str):
-            sln= line.split(' ')
-
-            if sln[0] == self.mnemonic:
-                if (len(sln) != 2):
-                    errtxt= '{} expects one relative jump address. But got {}'
-                    errtext= errtxt.format(self.mnemonic, len(sln))
-
-                    raise (DecodeException('medium', errtxt))
-
-                self.program= program
-                self.jump= sln[1]
-                return
-
-        raise (DecodeException('low',
-                               'Does not match {}'.format(self.mnemonic)))
-    def __bytes__(self):
-        if self.jump not in self.program.labels:
-            text= 'label {} could not be found'.format(self.jump)
-            raise EncodeException('high', text)
-
-        label= self.program.labels[self.jump]
-
-        direction, length= label.get_offset(self.position)
-
-        if (direction != self.direction):
-            dmap= {'pos': 'is not behind the current position',
-                   'neg': 'is not before the current position'}
-
-            text= '{} selected but {} {}'.format(self.mnemonic, self.jump, dmap[self.direction])
-            raise EncodeException('high', text)
-
-        if (length > 16):
-            text= 'label {} is {} bytes away but jumps can only span 16 bytes'
-            raise EncodeException('high', text.format(self.jump, length))
-
-        return bytes([self.opcode | (length-1)])
-
-    def __str__(self):
-        return '{} {}'.format(self.mnemonic, self.jump)
-
-
-class ProtoTwoRegisters(ProtoBase):
-    def __init__(self, program, line):
-        if isinstance(line, bytes):
-            if (line[0] & 0xf0) == self.opcode:
-                self.inst= line
-                return
-
-        if isinstance(line, str):
-            sln= line.split(' ')
-
-            if sln[0] == self.mnemonic:
-                if (len(sln) != 3):
-                    errtxt= '{} expects two registers as arguments. But got {}'
-                    errtext= errtxt.format(self.mnemonic, len(sln))
-
-                    raise (DecodeException('medium', errtxt))
-
-                self.regx= Register(sln[1])
-                self.regy= Register(sln[2])
-                return
-
-        raise (DecodeException('low',
-                               'Does not match {}'.format(self.mnemonic)))
-
-    def __bytes__(self):
-        return bytes([self.opcode | int(self.regx) << 2 | int(self.regy)])
-
-    def __str__(self):
-        return '{} {} {}'.format(self.mnemonic, self.regx, self.regy)
-
-
-class ProtoMemReg (ProtoBase):
-    def __init__(self, program, line):
-        if isinstance(line, bytes):
-            if (line[0] & 0xe0) == self.opcode:
-                self.inst= line
-                return
-
-        if isinstance(line, str):
-            sln= line.split(' ')
-
-            if sln[0] == self.mnemonic:
-                if (len(sln) != 3):
-                    errtxt= '{} expects two arguments. But got {}'
-                    errtext= errtxt.format(self.mnemonic, len(sln))
-
-                    raise (DecodeException('medium', errtxt))
-
-                self.memaddr= MemAddr(sln[1])
-                self.reg= Register(sln[2])
-                return
-
-        raise (DecodeException('low',
-                               'Does not match {}'.format(self.mnemonic)))
-
-    def __bytes__(self):
-        return bytes([self.opcode | int(self.memaddr) << 2 | int(self.reg)])
-
-    def __str__(self):
-        return '{} {} {}'.format(self.mnemonic, self.memaddr, self.reg)
-
 class ProtoCmd (ProtoBase):
+    specfmt= '{: ^13}| {:11}| {}'
+
+    def __init__(self, program, line):
+        if isinstance(line, int):
+            if (line & self.opcodemask() == self.opcode):
+                self.instruction= line
+                return
+
+        if isinstance(line, str):
+            self.match_prototype(line)
+    
     def cmdtype(self):
         pt= self.prototype.split(' ')
 
@@ -261,6 +113,34 @@ class ProtoCmd (ProtoBase):
 
         return masks[self.cmdtype]
 
+    @classmethod
+    def specification_line(cls):
+        encoding= list('{:08b}'.format(cls.opcode))
+
+        prototype= getattr(cls, 'alfrom', None) or cls.prototype
+        pt= prototype.split(' ')
+
+        if ('XX' in pt):
+            encoding[6:8]=list('XX')
+
+        if ('YY' in pt):
+            encoding[4:6]=list('YY')
+
+        if ('NNN' in pt):
+            encoding[3:6]=list('NNN')
+
+        if ('NNNN' in pt):
+            encoding[4:6]=list('NNNN')
+
+        estr= ' '.join(encoding[2*a] + encoding[2*a+1]
+                       for a in range(4))
+
+        padproto= ' '.join(s.ljust(3) for s in pt)
+        
+        spec= cls.specfmt.format(estr, padproto, cls.description)
+
+        return (spec)
+
     def match_prototype(self, line):
         sln= line.split(' ')
         pt= self.prototype.split(' ')
@@ -285,15 +165,8 @@ class ProtoCmd (ProtoBase):
 
         return (parms)
 
-    def __init__(self, program, line):
-        if isinstance(line, int):
-            if (line & self.opcodemask() == self.opcode):
-                self.instruction= line
-                return
-
-        if isinstance(line, str):
-            self.match_prototype(line)
-
+    def __int__(self):
+        return (0)
 
 class ProtoConstant(ProtoBase):
     def __init__(self, program, line):
@@ -304,8 +177,8 @@ class ProtoConstant(ProtoBase):
         if isinstance(line, str):
             self.value= self.parse(line)
 
-    def __bytes__(self):
-        return bytes([self.value])
+    def __int__(self):
+        return self.value
 
     def __str__(self):
         return hex(self.value)
@@ -460,7 +333,7 @@ class CmdSEQ (ProtoCmd):
 class CmdSNE (ProtoCmd):
     description= 'Skip next instruction if not equal'
     opcode=0b10110000
-    prototype= 'SNE SS YY'
+    prototype= 'SNE XX YY'
 
 class CmdLDA (ProtoCmd):
     description= 'Load io address NNN into register XX'
