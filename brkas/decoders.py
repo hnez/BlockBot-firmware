@@ -75,6 +75,8 @@ class Jump(object):
 
         return (length - 1)
 
+    def __str__(self):
+        return (self.label)
 
 class MemAddr(object):
     names= 'Mot1 Mot2 DIn DOut Timer Ram1 Ram2 Ram3'.split()
@@ -107,7 +109,13 @@ class ProtoBase(object):
 
 class ProtoCmd (ProtoBase):
     specfmt= '{: ^13}| {:11}| {}'
-
+    disasmfmt= '    {:14} // {}'
+    parmmap= [('XX', 'reg1', Register),
+              ('YY', 'reg2', Register),
+              ('NNN', 'mem', MemAddr),
+              ('NNNN', 'jump', Jump)]
+    prototoname= dict((a[0], a[1]) for a in parmmap)
+    
     def match_prototype(self, line):
         sln= line.split(' ')
         pt= self.prototype.split(' ')
@@ -141,17 +149,12 @@ class ProtoCmd (ProtoBase):
         if isinstance(line, str):
             parms= self.match_prototype(line)
 
-            cmap= [('XX', 'reg1', Register),
-                   ('YY', 'reg2', Register),
-                   ('NNN', 'mem', MemAddr),
-                   ('NNNN', 'jump', Jump)]
-
             self.program= program
             self.args= dict(
                 (
                     c[1],
                     c[2](self, parms[c[0]])
-                ) for c in cmap if c[0] in parms
+                ) for c in self.parmmap if c[0] in parms
             )
 
     def cmdtype(self):
@@ -223,13 +226,25 @@ class ProtoCmd (ProtoBase):
             instr|= int(self.args['reg1'])
 
         if 'mem' in self.args:
-            instr|= int(self.args['mem']) << 2
+            instr|= int(self.args['reg1']) | (int(self.args['mem']) << 2)
 
         if 'jump' in self.args:
             instr |= int(self.args['jump'])
 
         return (bytes([instr]))
 
+    def __str__(self):
+        pt= self.prototype.split()
+
+        disasm=list(str(self.args[self.prototoname[p]])
+                    for p in pt[1:])
+
+        text= self.disasmfmt.format(' '.join(pt[0:1] + disasm),
+                                    self.description)
+        
+        return (text)
+        
+    
 class ProtoConstant(ProtoBase):
     def __init__(self, program, line):
         if isinstance(line, bytes):
@@ -243,7 +258,7 @@ class ProtoConstant(ProtoBase):
         return (bytes([self.value]))
 
     def __str__(self):
-        return hex(self.value)
+        return ('    ' + hex(self.value))
 
 
 class ProtoAlias(ProtoBase):
