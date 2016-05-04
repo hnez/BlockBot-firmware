@@ -444,10 +444,22 @@ class AliasSRL (ProtoAlias, CmdADD):
     alfrom= 'SRL XX'
     alto= 'ADD XX XX'
 
-class CmdConstant (ProtoConstant):
+class ConstNumber (ProtoConstant):
     def parse(self, line):
         try:
             return int(line, base=0)
         except ValueError:
             errtxt= '{} is not a number'.format(line)
             raise DecodeException('low', errtxt)
+
+def list_decoders():
+    decoders=[]
+    globpairs= globals().items()
+
+    for pr in ['Cmd', 'Alias', 'Const']:
+        decoders.extend(d[1] for d in globpairs
+                        if d[0].startswith(pr))
+
+    return decoders
+
+decoders= list_decoders()

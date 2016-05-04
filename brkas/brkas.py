@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from decoders import *
+from decoders import DecodeException, decoders
 
 class DecodeExeCollection(Exception):
     def __init__(self, linenum=None):
@@ -19,19 +19,6 @@ class DecodeExeCollection(Exception):
         return (errs)
 
 class Program(object):
-    decoders= [
-        CmdSOV, CmdSPU, CmdSPO, CmdSPJ,
-        CmdLD,
-        CmdDEC, CmdINC, CmdNOT, CmdSRR,
-        CmdJFW, CmdJBW,
-        CmdMOV, CmdOR,  CmdAND, CmdXOR,
-        CmdADD, CmdSUB, CmdSEQ, CmdSNE,
-        CmdLDA, CmdSTA,
-        AliasNEG, AliasSRL, AliasNOP,
-        CmdLabel,
-        CmdConstant
-    ]
-
     def __init__(self):
         self.labels={}
         self.ops=[]
@@ -60,7 +47,7 @@ class Program(object):
 
         exe= DecodeExeCollection(linenum)
 
-        for dc in self.decoders:
+        for dc in decoders:
             try:
                 return (dc(self, ln))
             except DecodeException as e:
@@ -90,7 +77,7 @@ class Program(object):
 
     @classmethod
     def to_specification(cls):
-        ops= filter(lambda o: getattr(o, 'opcode', False), cls.decoders)
+        ops= filter(lambda o: getattr(o, 'opcode', False), decoders)
         ops= sorted(ops, key= lambda a: a.opcode)
 
         spec= ops[0].specfmt.format('Instr bits', 'Name', 'Description') + '\n'
