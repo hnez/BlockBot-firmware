@@ -97,14 +97,16 @@ class Program(object):
         spec+= '\n'.join(map(lambda o: o.specification_line(), ops))
 
         return (spec)
-    
+
     def to_text(self):
         return ('\n'.join(map(str, self.ops)))
 
     def to_bytecode(self):
-        bc= bytes(map(int, self.ops))
+        bc= bytes()
+        for o in map(bytes, self.ops):
+            bc+=o
 
-        return bc
+        return (bc)
 
 p=Program()
 p.from_textfile('tst.brkas')

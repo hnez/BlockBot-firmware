@@ -24,7 +24,7 @@ class Register(object):
     numtoreg= dict(enumerate(names))
     regtonum= dict((a[1], a[0]) for a in numtoreg.items())
 
-    def __init__ (self, name):
+    def __init__ (self, command, name):
         if name in self.regtonum:
             self.regnum= self.regtonum[name]
         elif name.isdecimal() and int(name) in self.numtoreg:
@@ -40,12 +40,48 @@ class Register(object):
     def __str__(self):
         return self.numtoreg[self.regnum]
 
+class Jump(object):
+    maximum_jumplength= 16
+
+    def __init__(self, command, label):
+        self.command= command
+        self.label= label
+
+    def __int__(self):
+        command= self.command
+        labels= command.program.labels
+
+        if self.label not in labels:
+            text= 'label {} could not be found.'.format(self.jump)
+            text+= 'Make sure you typed it correctly and in the right case.'
+            raise EncodeException('high', text)
+
+        label= labels[self.label]
+
+        direction, length= label.get_offset(command.position)
+
+        if (direction != command.direction):
+            dmap= {'pos': 'is not behind the current position. Use JBW instead',
+                   'neg': 'is not before the current position. Use JFW instead'}
+
+            text= '{} selected but {} {}'.format(self.mnemonic, self.jump, dmap[self.direction])
+            raise EncodeException('high', text)
+
+        if (length > self.maximum_jumplength):
+            text= 'Label {} is {} bytes away but jumps can only span {} bytes.'
+            text+= 'Consider putting a intermediate jumppoint in the middle of the spanned codeblock.'
+            text= text.format(self.jump, length, self.maximum_jumplength)
+            raise EncodeException('high', text)
+
+        return (length - 1)
+
+
 class MemAddr(object):
     names= 'Mot1 Mot2 DIn DOut Timer Ram1 Ram2 Ram3'.split()
     numtoname= dict(enumerate(names))
     nametonum= dict((a[1], a[0]) for a in numtoname.items())
 
-    def __init__ (self, name):
+    def __init__ (self, command, name):
         if name in self.nametonum:
             self.memnum= self.nametonum[name]
         elif name.isdecimal() and int(name) in self.numtoname:
@@ -72,6 +108,30 @@ class ProtoBase(object):
 class ProtoCmd (ProtoBase):
     specfmt= '{: ^13}| {:11}| {}'
 
+    def match_prototype(self, line):
+        sln= line.split(' ')
+        pt= self.prototype.split(' ')
+
+        if (sln[0].upper() != pt[0]):
+            text= '{} does not match {}'.format(sln[0], pt[0])
+            raise DecodeException('low', text)
+
+        if (sln[0] != pt[0]):
+            text= '{} does not match {}. Please note, that brkas is case sensitve.'
+            text+= 'use {} instead of {}'
+            text=text.format(sln[0], pt[0], sln[0].upper(), sln[0])
+            raise DecodeException('high', text)
+
+        if len(sln) != len(pt):
+            text= 'You supplied {} arguments but {} expects {} ({})'
+            text= text.format(len(sln)-1, pt[0] ,len(pt)-1, self.prototype)
+
+            raise DecodeException('high', text)
+
+        parms= dict((tk, sln[pos]) for (pos, tk) in enumerate(pt))
+
+        return (parms)
+
     def __init__(self, program, line):
         if isinstance(line, int):
             if (line & self.opcodemask() == self.opcode):
@@ -79,8 +139,21 @@ class ProtoCmd (ProtoBase):
                 return
 
         if isinstance(line, str):
-            self.match_prototype(line)
-    
+            parms= self.match_prototype(line)
+
+            cmap= [('XX', 'reg1', Register),
+                   ('YY', 'reg2', Register),
+                   ('NNN', 'mem', MemAddr),
+                   ('NNNN', 'jump', Jump)]
+
+            self.program= program
+            self.args= dict(
+                (
+                    c[1],
+                    c[2](self, parms[c[0]])
+                ) for c in cmap if c[0] in parms
+            )
+
     def cmdtype(self):
         pt= self.prototype.split(' ')
 
@@ -136,37 +209,26 @@ class ProtoCmd (ProtoBase):
                        for a in range(4))
 
         padproto= ' '.join(s.ljust(3) for s in pt)
-        
+
         spec= cls.specfmt.format(estr, padproto, cls.description)
 
         return (spec)
 
-    def match_prototype(self, line):
-        sln= line.split(' ')
-        pt= self.prototype.split(' ')
+    def __bytes__(self):
+        instr= self.opcode
 
-        if (sln[0].upper() != pt[0]):
-            text= '{} does not match {}'.format(sln[0], pt[0])
-            raise DecodeException('low', text)
+        if 'reg2' in self.args:
+            instr|= int(self.args['reg2']) | (int(self.args['reg1']) << 2)
+        elif 'reg1' in self.args:
+            instr|= int(self.args['reg1'])
 
-        if (sln[0] != pt[0]):
-            text= '{} does not match {}. Please note, that brkas is case sensitve.'
-            text+= 'use {} instead of {}'
-            text=text.format(sln[0], pt[0], sln[0].upper(), sln[0])
-            raise DecodeException('high', text)
+        if 'mem' in self.args:
+            instr|= int(self.args['mem']) << 2
 
-        if len(sln) != len(pt):
-            text= 'You supplied {} arguments but {} expects {} ({})'
-            text= text.format(len(sln)-1, pt[0] ,len(pt)-1, self.prototype)
+        if 'jump' in self.args:
+            instr |= int(self.args['jump'])
 
-            raise DecodeException('high', text)
-
-        parms= {(tk, sln[pos]) for (pos, tk) in enumerate(pt)}
-
-        return (parms)
-
-    def __int__(self):
-        return (0)
+        return (bytes([instr]))
 
 class ProtoConstant(ProtoBase):
     def __init__(self, program, line):
@@ -177,8 +239,8 @@ class ProtoConstant(ProtoBase):
         if isinstance(line, str):
             self.value= self.parse(line)
 
-    def __int__(self):
-        return self.value
+    def __bytes__(self):
+        return (bytes([self.value]))
 
     def __str__(self):
         return hex(self.value)
