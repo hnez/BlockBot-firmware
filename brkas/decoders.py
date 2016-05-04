@@ -97,7 +97,7 @@ class MemAddr(object):
         return self.memnum
 
     def __str__(self):
-        return self.numtoname[self.memnum]
+        return '"{}"'.format(self.numtoname[self.memnum])
 
 
 class ProtoBase(object):
@@ -109,13 +109,13 @@ class ProtoBase(object):
 
 class ProtoCmd (ProtoBase):
     specfmt= '{: ^13}| {:11}| {}'
-    disasmfmt= '    {:14} // {}'
+    disasmfmt= '    {:16} // {}'
     parmmap= [('XX', 'reg1', Register),
               ('YY', 'reg2', Register),
               ('NNN', 'mem', MemAddr),
               ('NNNN', 'jump', Jump)]
     prototoname= dict((a[0], a[1]) for a in parmmap)
-    
+
     def match_prototype(self, line):
         sln= line.split(' ')
         pt= self.prototype.split(' ')
@@ -235,16 +235,23 @@ class ProtoCmd (ProtoBase):
 
     def __str__(self):
         pt= self.prototype.split()
+        ds= self.description.split()
 
-        disasm=list(str(self.args[self.prototoname[p]])
-                    for p in pt[1:])
+        args= self.args
+        prne= self.prototoname
 
-        text= self.disasmfmt.format(' '.join(pt[0:1] + disasm),
-                                    self.description)
-        
+        spt= list(str(args[prne[p]]) if p in prne else p
+                      for p in pt)
+
+        sds= list(str(args[prne[d]]) if d in prne else d
+                      for d in ds)
+
+        text= self.disasmfmt.format(' '.join(spt),
+                                    ' '.join(sds))
+
         return (text)
-        
-    
+
+
 class ProtoConstant(ProtoBase):
     def __init__(self, program, line):
         if isinstance(line, bytes):
@@ -361,13 +368,13 @@ class CmdSRR (ProtoCmd):
     prototype= 'SRR XX'
 
 class CmdJFW (ProtoCmd):
-    description= 'Jump forward NNNN instructions'
+    description= 'Jump forward to label NNNN'
     opcode=0b00100000
     prototype= 'JFW NNNN'
     direction= 'pos'
 
 class CmdJBW (ProtoCmd):
-    description= 'Jump backwards NNNN instructions'
+    description= 'Jump backwards to label NNNN'
     opcode=0b00110000
     prototype= 'JBW NNNN'
     direction= 'neg'
