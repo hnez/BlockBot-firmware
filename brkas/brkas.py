@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
+import sys
 from decoders import DecodeException, decoders
+
 
 class DecodeExeCollection(Exception):
     def __init__(self, linenum=None):
@@ -89,6 +91,32 @@ class Program(object):
         self.ops.extend(self._decode_bytecode((b[0], bytes([b[1]])))
                         for b in  enumerate(bc))
 
+    def from_bytecodefile(self, path):
+        fd= open(path, 'rb')
+        bytecode=fd.read()
+        fd.close()
+
+        self.from_bytecode(bytecode)
+
+    def to_text(self):
+        return ('\n'.join(map(str, self.ops)) + '\n')
+
+    def to_textfile(self, path):
+        fd= open(path, 'w', encoding='utf-8')
+        fd.write(self.to_text())
+        fd.close()
+
+    def to_bytecode(self):
+        bc= bytes()
+        for o in map(bytes, self.ops):
+            bc+=o
+
+        return (bc)
+
+    def to_bytecodefile(self, path):
+        fd= open(path, 'wb')
+        fd.write(self.to_bytecode())
+        fd.close()
 
     @classmethod
     def to_specification(cls):
@@ -100,16 +128,47 @@ class Program(object):
 
         return (spec)
 
-    def to_text(self):
-        return ('\n'.join(map(str, self.ops)))
+    @classmethod
+    def to_specificationfile(cls, path):
+        fd= open(path, 'w', encoding='utf-8')
+        fd.write(cls.to_specification())
+        fd.close()
 
-    def to_bytecode(self):
-        bc= bytes()
-        for o in map(bytes, self.ops):
-            bc+=o
+def main(args):
+    if (len(args) == 0 or len(args) % 2 != 0):
+        lines= []
+        lines.append('Brkas expects parameters as command filename pairs.')
+        lines.append('Available commands are:')
+        lines.append(' source_in sourcefile.brkas         - Assembly source file')
+        lines.append(' bytecode_in bytecode.bc            - Bytecode output file')
+        lines.append(' source_out sourcefile.brkas        - Disassembly file')
+        lines.append(' bytecode_out bytecode.bc           - Assembly file')
+        lines.append(' specification_out specification.md - Bytecode specification')
+        lines.append('')
+        lines.append('example:')
+        lines.append(' brkas source_in tst.brkas bytecode_out tst.bc')
 
-        return (bc)
+        sys.stderr.write('\n'.join(lines) + '\n')
 
-p=Program()
-p.from_textfile('tst.brkas')
-u=Program()
+        return
+
+    parms= dict(zip(args[0::2],args[1::2]))
+    prog= Program()
+
+    if ('source_in' in parms):
+        prog.from_textfile(parms['source_in'])
+
+    if ('bytecode_in' in parms):
+        prog.from_bytecodefile(parms['bytecode_in'])
+
+    if ('source_out' in parms):
+        prog.to_textfile(parms['source_out'])
+
+    if ('bytecode_out' in parms):
+        prog.to_bytecodefile(parms['bytecode_out'])
+
+    if ('specification_out' in parms):
+        prog.to_specificationfile(parms['specification_out'])
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
