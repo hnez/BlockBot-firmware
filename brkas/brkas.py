@@ -120,11 +120,15 @@ class Program(object):
 
     @classmethod
     def to_specification(cls):
-        ops= filter(lambda o: getattr(o, 'opcode', False), decoders)
+        opal= filter(lambda o: 'opcode' in o.__dict__, decoders)
+        ops= filter(lambda o: 'alfrom' not in o.__dict__, opal)
+        aliases= filter(lambda o: 'alfrom' in o.__dict__, opal)
+
         ops= sorted(ops, key= lambda a: a.opcode)
 
         spec= ops[0].specfmt.format('Instr bits', 'Name', 'Description') + '\n'
         spec+= '\n'.join(map(lambda o: o.specification_line(), ops))
+        spec+= '\n'
 
         return (spec)
 

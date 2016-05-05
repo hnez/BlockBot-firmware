@@ -193,8 +193,6 @@ class ProtoCmd (ProtoBase):
 
         mask= 0xff^((1 << argbits)-1)
 
-#        print(self.prototype, ''.join(pt[1:]), argbits, hex(mask))
-
         return (mask)
 
     @classmethod
