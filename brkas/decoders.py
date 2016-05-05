@@ -27,7 +27,7 @@ class Register(object):
     def __init__ (self, command, name):
         if name in self.regtonum:
             self.regnum= self.regtonum[name]
-        elif name.isdecimal() and int(name) in self.numtoreg:
+        elif (isinstance(name, int) or name.isdecimal()) and int(name) in self.numtoreg:
             self.regnum= int(name)
         else:
             errtxt= 'Expected one of "{}" '.format(', '.join(self.names))
@@ -45,7 +45,7 @@ class Jump(object):
 
     def __init__(self, command, label):
         self.command= command
-        self.label= label
+        self.label= label if not isinstance(label, int) else 'anon' +str(label)
 
     def __int__(self):
         command= self.command
@@ -86,8 +86,8 @@ class MemAddr(object):
     def __init__ (self, command, name):
         if name in self.nametonum:
             self.memnum= self.nametonum[name]
-        elif name.isdecimal() and int(name) in self.numtoname:
-            self.regnum= int(name)
+        elif (isinstance(name, int) or name.isdecimal()) and int(name) in self.numtoname:
+            self.memnum= int(name)
         else:
             errtxt= 'Expected one of "{}" '.format(', '.join(self.names))
             errtxt+= 'as memory slot name. Got "{}"'.format(name)
@@ -97,7 +97,7 @@ class MemAddr(object):
         return self.memnum
 
     def __str__(self):
-        return '"{}"'.format(self.numtoname[self.memnum])
+        return str(self.numtoname[self.memnum])
 
 
 class ProtoBase(object):
@@ -112,11 +112,11 @@ class ProtoCmd (ProtoBase):
     disasmfmt= '    {:16} // {}'
     parmmap= [('XX', 'reg1', Register),
               ('YY', 'reg2', Register),
-              ('NNN', 'mem', MemAddr),
+              ('AAA', 'mem', MemAddr),
               ('NNNN', 'jump', Jump)]
     prototoname= dict((a[0], a[1]) for a in parmmap)
 
-    def match_prototype(self, line):
+    def text_match_prototype(self, line):
         sln= line.split(' ')
         pt= self.prototype.split(' ')
 
@@ -140,16 +140,41 @@ class ProtoCmd (ProtoBase):
 
         return (parms)
 
+    def bytecode_match_prototype(self, bc):
+        pt= self.prototype.split(' ')
+        parms={}
+
+        if (bc & self.opcodemask() != self.opcode):
+            text='{}&{} does not match{}'.format(bc, self.opcodemask(), self.opcode)
+            raise DecodeException('low', text)
+
+        if ('YY' in pt):
+            parms['reg1']= Register(self, (bc & 0x0c) >> 2)
+            parms['reg2']= Register(self, bc & 0x03)
+        elif ('XX' in pt):
+            parms['reg1']= Register(self, bc & 0x03)
+
+        if ('AAA' in pt):
+            parms['mem']= MemAddr(self, (bc & 0x1c) >> 2)
+
+        if ('NNNN' in pt):
+            parms['jump']= Jump(self, bc & 0x0f)
+
+        return parms
+
     def __init__(self, program, line):
-        if isinstance(line, int):
-            if (line & self.opcodemask() == self.opcode):
-                self.instruction= line
-                return
+        self.program= program
+
+        if isinstance(line, bytes):
+            parms= self.bytecode_match_prototype(line[0])
+
+            self.args= parms
+
+            return
 
         if isinstance(line, str):
-            parms= self.match_prototype(line)
+            parms= self.text_match_prototype(line)
 
-            self.program= program
             self.args= dict(
                 (
                     c[1],
@@ -157,37 +182,20 @@ class ProtoCmd (ProtoBase):
                 ) for c in self.parmmap if c[0] in parms
             )
 
-    def cmdtype(self):
-        pt= self.prototype.split(' ')
+            return
 
-        if len(pt) == 1:
-            return 'NoArgs'
-
-        if len(pt) == 2:
-            if pt[1] == 'XX':
-                return 'SingleReg'
-
-            if pt[1] == 'NNNN':
-                return 'Jump'
-
-        if len(pt) == 3:
-            if pt[1] == 'XX' and pt[2] == 'YY':
-                return 'TwoRegs'
-
-            if pt[1] == 'NNN' and pt[2] == 'XX':
-                return 'RegMem'
-
-        text= 'Prototype "{}" has unkown type'.format(self.prototype)
-        raise DecodeException('high', text)
+        raise Exception('Incompatible input type')
 
     def opcodemask(self):
-        masks= {'NoArgs': 0xff,
-                'SingleReg': 0xfc,
-                'Jump': 0xf0,
-                'TwoRegs': 0xf0,
-                'RegMem': 0xe0}
+        pt= self.prototype.split()
 
-        return masks[self.cmdtype]
+        argbits= len(''.join(pt[1:]))
+
+        mask= 0xff^((1 << argbits)-1)
+
+#        print(self.prototype, ''.join(pt[1:]), argbits, hex(mask))
+
+        return (mask)
 
     @classmethod
     def specification_line(cls):
@@ -202,8 +210,8 @@ class ProtoCmd (ProtoBase):
         if ('YY' in pt):
             encoding[4:6]=list('YY')
 
-        if ('NNN' in pt):
-            encoding[3:6]=list('NNN')
+        if ('AAA' in pt):
+            encoding[3:6]=list('AAA')
 
         if ('NNNN' in pt):
             encoding[4:6]=list('NNNN')
@@ -420,14 +428,14 @@ class CmdSNE (ProtoCmd):
     prototype= 'SNE XX YY'
 
 class CmdLDA (ProtoCmd):
-    description= 'Load io address NNN into register XX'
-    opcode=0b1100000
-    prototype= 'LDA NNN XX'
+    description= 'Load io address AAA into register XX'
+    opcode=0b11000000
+    prototype= 'LDA AAA XX'
 
 class CmdSTA (ProtoCmd):
-    description= 'Store Register XX into io address NNN'
-    opcode=0b1110000
-    prototype= 'STA NNN XX'
+    description= 'Store Register XX into io address AAA'
+    opcode=0b11100000
+    prototype= 'STA AAA XX'
 
 class AliasNEG (ProtoAlias, CmdSUB):
     description= 'Gives the 2-complement of a number'

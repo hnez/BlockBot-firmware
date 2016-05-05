@@ -42,7 +42,7 @@ class Program(object):
 
         return (lines)
 
-    def _decode_line(self, line):
+    def _decode_textline(self, line):
         linenum, ln= line
 
         exe= DecodeExeCollection(linenum)
@@ -55,10 +55,23 @@ class Program(object):
 
         raise exe
 
+    def _decode_bytecode(self, op):
+        addr, inst= op
+
+        exe= DecodeExeCollection(addr)
+
+        for dc in decoders:
+            try:
+                return (dc(self, inst))
+            except DecodeException as e:
+                exe.append(e)
+
+        raise exe
+
     def from_text(self, text):
         lines= self._lines_from_text(text)
 
-        self.ops.extend(map(self._decode_line, enumerate(lines)))
+        self.ops.extend(map(self._decode_textline, enumerate(lines)))
 
         offset=0
         for op in self.ops:
@@ -73,7 +86,9 @@ class Program(object):
         self.from_text(text)
 
     def from_bytecode(self, bc):
-        pass
+        self.ops.extend(self._decode_bytecode((b[0], bytes([b[1]])))
+                        for b in  enumerate(bc))
+
 
     @classmethod
     def to_specification(cls):
@@ -97,3 +112,4 @@ class Program(object):
 
 p=Program()
 p.from_textfile('tst.brkas')
+u=Program()
