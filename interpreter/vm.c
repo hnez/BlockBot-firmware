@@ -3,6 +3,8 @@
 #include "vm.h"
 #include "opcodes.h"
 
+struct vm_status_t vm_status;
+
 uint8_t vm_step (void)
 {
   if (vm_verify_jmp(VM_JMP_FWD, 1)) { 
