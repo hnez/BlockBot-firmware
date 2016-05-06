@@ -22,7 +22,9 @@ inline uint8_t button_pwr_pressed(void)
 inline void buttons_init(void)
 {
   // Enable Pullups
-  
+
   BUTTON_PWR_PORT|= _BV(BUTTON_PWR_NUM);
   BUTTON_PLAY_PORT|= _BV(BUTTON_PLAY_NUM);
 }
+
+uint8_t mem_getdin (uint8_t);

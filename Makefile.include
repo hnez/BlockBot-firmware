@@ -21,5 +21,9 @@ clean:
 flash: $(PROGNAME).elf
 	$(FLASHPROG) $(FLASHFLAGS) -U flash:w:$(PROGNAME).elf
 
+.PHONY: fuse
+fuse:
+	$(FLASHPROG) $(FLASHFLAGS) $(FUSES)
+
 %.elf : $(OBJECTS)
 	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $(LIBS)

@@ -1,11 +1,14 @@
 #include <avr/io.h>
 #include <util/delay.h>
+#include <avr/interrupt.h>
 
 #include <vm.h>
 
 #include "motor.h"
 #include "buttons.h"
 #include "suart.h"
+#include "timer.h"
+#include "leds.h"
 
 #define NULL ((void *)0)
 
@@ -31,9 +34,9 @@ uint8_t mem_setmot (uint8_t addr, uint8_t val)
 PROGMEM const struct mem_slot mem_map[8]= {
   {mem_getmot,   mem_setmot},
   {mem_getmot,   mem_setmot},
-  {NULL,   NULL},
-  {NULL,   NULL},
-  {NULL,   NULL},
+  {mem_getdin,   NULL},
+  {mem_getled,   mem_setled},
+  {mem_gettimer, mem_settimer},
   {NULL,   NULL},
   {NULL,   NULL},
   {NULL,   NULL}
@@ -48,19 +51,17 @@ int main (void)
   uart_init();
   motor_init();
   buttons_init();
+  leds_init();
 
-  uart_puts("Motoren init\r\n");
-  motor_1_set(0);
-  motor_2_set(0);
+  sei();
 
   vm_status.pc=0;
   vm_status.prog= prog;
   vm_status.prog_len= sizeof(prog)+1;
 
-  uart_puts("Run\r\n");
   for(;;) {
-    vm_step();  
-  
+    vm_step();
+
     _delay_ms(1000);
   }
 
