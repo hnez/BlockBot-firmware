@@ -1,5 +1,33 @@
 #!/usr/bin/env python3
 
+'''
+    Copyright 2016 Leonard Göhrs
+
+    This file is part of BrkAs.
+
+    BrkAs is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    BrkAs is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with BrkAs.  If not, see <http://www.gnu.org/licenses/>.
+'''
+
+# This software started out to be a clean and modular assembler
+# but ended up being quite the opposite
+# (a unclean and hackish dissassembler).
+# Some work would be required to get it into a nice shape,
+# work like making this not the only comment in the whole sourcecode.
+# But the assembler and disassembler work for now and features can
+# still be added and removed without digging in to much crud
+# so i will postpone those cleanups to 'later'.
+
 import sys
 from decoders import DecodeException, decoders
 
