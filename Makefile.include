@@ -1,4 +1,4 @@
-OBJECTS= $(patsubst %.c, %.o, $(SOURCES))
+OBJECTS+= $(patsubst %.c, %.o, $(SOURCES))
 CC= avr-gcc
 
 FLASHDEV?= -c arduino -b 57600 -P /dev/ttyACM0
