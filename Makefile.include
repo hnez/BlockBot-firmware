@@ -8,10 +8,10 @@ FLASHFLAGS+= -p $(CPU) -e $(FLASHDEV)
 CFLAGS+= -mmcu=$(CPU) -DF_CPU=$(FREQ)L
 CFLAGS+= -ffunction-sections -fdata-sections \
 	-fno-caller-saves -Os -Wall -Wextra -pedantic -Werror -Wshadow -Wstrict-overflow \
-	-fno-strict-aliasing -std=c11
+	-fno-strict-aliasing -std=c11 -static
 
 .PHONY: all
-all: $(PROGNAME).elf
+all: $(PROGNAME).elf $(TARGETS)
 
 .PHONY: clean
 clean:

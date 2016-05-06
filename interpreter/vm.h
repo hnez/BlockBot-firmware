@@ -56,3 +56,6 @@ inline uint8_t vm_next_op (void)
   
   return (vm_status.prog[++vm_status.pc]);
 }
+
+uint8_t vm_step (void);
+void vm_run (void);
