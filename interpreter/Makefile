@@ -2,7 +2,7 @@
 # $ make CPU=attiny44 FREQ=1000000
 
 AR= avr-ar
-SOURCES= opcodes.c vm.c
+SOURCES= opcodes.c vm.c register.c
 
 .PHONY: gen
 gen : libbrkvm.$(CPU)-$(FREQ).a
