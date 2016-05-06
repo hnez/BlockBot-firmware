@@ -69,6 +69,7 @@ class Jump(object):
     def __int__(self):
         command= self.command
         labels= command.program.labels
+        pt= self.command.prototype.split()
 
         if self.label not in labels:
             text= 'label {} could not be found.'.format(self.jump)
@@ -83,13 +84,16 @@ class Jump(object):
             dmap= {'pos': 'is not behind the current position. Use JBW instead',
                    'neg': 'is not before the current position. Use JFW instead'}
 
-            text= '{} selected but {} {}'.format(self.mnemonic, self.jump, dmap[self.direction])
+            text= '{} selected but {} {}'.format(pt[0], self.jump, dmap[self.direction])
             raise EncodeException('high', text)
 
         if (length > self.maximum_jumplength):
             text= 'Label {} is {} bytes away but jumps can only span {} bytes.'
-            text+= 'Consider putting a intermediate jumppoint in the middle of the spanned codeblock.'
-            text= text.format(self.jump, length, self.maximum_jumplength)
+            text+= 'Consider putting an intermediate jumppoint in the middle of the spanned codeblock.\n'
+            text+= '  SKP      // Allways skip next instruction in linear execution\n'
+            text+= 'impoint:   // Jump to this label instead\n'
+            text+= '  {} {} // Perform desired jump\n'
+            text= text.format(self.label, length, self.maximum_jumplength, pt[0], self.label)
             raise EncodeException('high', text)
 
         return (length - 1)
@@ -468,6 +472,12 @@ class AliasSRL (ProtoAlias, CmdADD):
     description= 'Shift register left by one bit'
     alfrom= 'SRL XX'
     alto= 'ADD XX XX'
+
+class AliasSKP (ProtoAlias, CmdSEQ):
+    description= 'Allways skip next instruction'
+    alfrom= 'SKP'
+    alto= 'SEQ RZ RZ'
+
 
 class ConstNumber (ProtoConstant):
     def parse(self, line):

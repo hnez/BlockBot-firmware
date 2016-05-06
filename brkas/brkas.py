@@ -29,11 +29,14 @@
 # so i will postpone those cleanups to 'later'.
 
 import sys
-from decoders import DecodeException, decoders
+from decoders import DecodeException, EncodeException, decoders
 
 
 class DecodeExeCollection(Exception):
-    def __init__(self, linenum=None):
+    numerrors= 5
+
+    def __init__(self, line='', linenum=None):
+        self.line= line
         self.linenum= linenum
         self.errors=[]
 
@@ -41,10 +44,14 @@ class DecodeExeCollection(Exception):
         self.errors.append(exception)
 
     def __str__(self):
-        errs= 'Error parsing line {} '.format(self.linenum)
-        errs+='see below for errors the separate parsing modules produced\n'
+        errs= 'Error parsing line {}\n'.format(self.linenum)
+        errs+= ' {:4} | {}\n'.format(self.linenum, self.line)
+        errs+='See below for the top {} '.format(self.numerrors)
+        errs+='errors the separate parsing modules produced\n'
 
-        errs+= '\n'.join(str(e) for e in sorted(self.errors))
+        errs+= '\n'.join('{:3} | {}'.format(e[0]+1,e[1])
+                         for e in enumerate(sorted(self.errors)[:self.numerrors]))
+        errs+= '\n...'
 
         return (errs)
 
@@ -75,7 +82,7 @@ class Program(object):
     def _decode_textline(self, line):
         linenum, ln= line
 
-        exe= DecodeExeCollection(linenum)
+        exe= DecodeExeCollection(ln, linenum)
 
         for dc in decoders:
             try:
@@ -88,7 +95,7 @@ class Program(object):
     def _decode_bytecode(self, op):
         addr, inst= op
 
-        exe= DecodeExeCollection(addr)
+        exe= DecodeExeCollection(hex(inst), addr)
 
         for dc in decoders:
             try:
@@ -187,20 +194,24 @@ def main(args):
     parms= dict(zip(args[0::2],args[1::2]))
     prog= Program()
 
-    if ('source_in' in parms):
-        prog.from_textfile(parms['source_in'])
+    try:
+        if ('source_in' in parms):
+            prog.from_textfile(parms['source_in'])
 
-    if ('bytecode_in' in parms):
-        prog.from_bytecodefile(parms['bytecode_in'])
+        if ('bytecode_in' in parms):
+            prog.from_bytecodefile(parms['bytecode_in'])
 
-    if ('source_out' in parms):
-        prog.to_textfile(parms['source_out'])
+        if ('source_out' in parms):
+            prog.to_textfile(parms['source_out'])
 
-    if ('bytecode_out' in parms):
-        prog.to_bytecodefile(parms['bytecode_out'])
+        if ('bytecode_out' in parms):
+            prog.to_bytecodefile(parms['bytecode_out'])
 
-    if ('specification_out' in parms):
-        prog.to_specificationfile(parms['specification_out'])
+        if ('specification_out' in parms):
+            prog.to_specificationfile(parms['specification_out'])
+
+    except DecodeExeCollection as e:
+        sys.stderr.write(str(e) + '\n')
 
 if __name__ == '__main__':
     main(sys.argv[1:])
