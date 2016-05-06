@@ -3,11 +3,26 @@
 #include <avr/io.h>
 #include <avr/pgmspace.h>
 
+#include "memory.h"
+
 #define VM_ERR 0
 #define VM_OK 1
 
 #define VM_JMP_BWD 0
 #define VM_JMP_FWD 1
+
+// TODO REMOVE ME !!
+void uart_puts(char *);
+
+inline void uart_puthb(uint8_t b)
+{
+  char hexnum[] = "0123456789abcdef";
+  char *string="  \r\n";
+  string[0]= hexnum[b>>4];
+  string[1]= hexnum[b&0x0f];
+
+  uart_puts(string);
+}
 
 
 struct vm_status_t {
@@ -54,7 +69,7 @@ inline uint8_t vm_next_op (void)
   // Should there be a check here ?
   // How would it indicate an error ?
   
-  return (vm_status.prog[++vm_status.pc]);
+  return (vm_status.prog[vm_status.pc++]);
 }
 
 uint8_t vm_step (void);

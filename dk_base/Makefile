@@ -1,7 +1,7 @@
 PROGNAME= robot
 CPU= attiny44
 FREQ= 1000000
-SOURCES= $(PROGNAME).c motor.c
+SOURCES= $(PROGNAME).c motor.c suart.c
 CFLAGS+= -I../interpreter
 CFLAGS+= -L../interpreter
 LIBS= -lbrkvm.$(CPU)-$(FREQ)

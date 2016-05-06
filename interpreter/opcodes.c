@@ -38,34 +38,36 @@ PROGMEM const op_cb_t op_opmap[16]= {
   op_unary,
   op_jfw,
   op_jbw,
-
-  op_lda,
-  op_lda,
-  op_sta,
-  op_sta,
-
+  
   op_mov,
   op_or,
   op_and,
   op_xor,
-
+  
   op_add,
   op_sub,
   op_seq,
-  op_sne
+  op_sne,
+  
+  op_lda,
+  op_lda,
+  op_sta,
+  op_sta
 };
 
 static uint8_t op_short (uint8_t op)
 {
-  switch (op & 0xfc) {
+  switch (op & 0x0c) {
   case 0x00:
     // NOP
 
     return (OP_OK);
     break;
 
-  case 0x04:
+  case 0x08:
     // LD
+
+    uart_puts("Load\r\n");
 
     // Check if next prog byte is still in the program
     if (vm_verify_jmp(VM_JMP_FWD, 1)) {
