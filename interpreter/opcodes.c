@@ -57,14 +57,27 @@ PROGMEM const op_cb_t op_opmap[16]= {
 
 static uint8_t op_short (uint8_t op)
 {
-  switch (op & 0x0c) {
-  case 0x00:
-    // NOP
+  switch (op & 0x0f) {
+  case 0x04:
+    // SOV
+    break;
 
-    return (OP_OK);
+  case 0x05:
+    // SPU
+    break;
+
+  case 0x06:
+    // SPO
+    break;
+
+  case 0x07:
+    // SPJ
     break;
 
   case 0x08:
+  case 0x09:
+  case 0x0a:
+  case 0x0b:
     // LD
 
     uart_puts("Load\r\n");
@@ -96,26 +109,25 @@ static uint8_t op_unary (uint8_t op)
   register uint8_t regnum= op_dec_reg(op);
   register uint8_t value= reg_get(regnum); 
   
-  switch (op & 0xfc) {
-  case (0x10): // DEC
+  switch (op & 0x0c) {
+  case (0x00): // DEC
     return(reg_set(regnum, 0 , value-1));
 
     break;
 
-  case (0x14): // INC
+  case (0x04): // INC
     return(reg_set(regnum, 0 , value+1));
 
     break;
 
-  case (0x18): // NOT
+  case (0x08): // NOT
     return(reg_set(regnum, 0 , ~value));
 
     break;
 
-  default:
-    // Can be removed when all subinstruction bits are in use
+  case (0x0c): // SRR
+    return(reg_set(regnum, 0 , value>>1));
 
-    return (OP_ERR);
     break;
   }
 }
