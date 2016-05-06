@@ -11,7 +11,7 @@ CFLAGS+= -ffunction-sections -fdata-sections \
 	-fno-strict-aliasing -std=c11 -static
 
 .PHONY: all
-all: $(PROGNAME).elf $(TARGETS)
+all: $(ATGTS) $(PROGNAME).elf
 
 .PHONY: clean
 clean:
@@ -22,4 +22,4 @@ flash: $(PROGNAME).elf
 	$(FLASHPROG) $(FLASHFLAGS) -U flash:w:$(PROGNAME).elf
 
 %.elf : $(OBJECTS)
-	$(CC) $(CFLAGS) -o $@ $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $(LIBS)
