@@ -1,8 +1,16 @@
-PROGNAME= interpreter
-CPU= attiny44
-FREQ= 1000000
-SOURCES= memory.c  opcodes.c  vm.c
+# CPU and FREQ have to be specified while making
+# $ make CPU=attiny44 FREQ=1000000
 
-FLASHDEV?= -c stk500v1 -b 19200 -P /dev/ttyUSB0
+AR= avr-ar
+SOURCES= opcodes.c vm.c register.c
+
+.PHONY: gen
+gen : libbrkvm.$(CPU)-$(FREQ).a
+
+libbrkvm.$(CPU)-$(FREQ).a: $(patsubst %.c, %.$(CPU)-$(FREQ).o, $(SOURCES))
+	$(AR) rcs $@ $^
+
+%.$(CPU)-$(FREQ).o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $^
 
 include ../Makefile.include

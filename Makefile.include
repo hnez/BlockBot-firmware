@@ -1,4 +1,4 @@
-OBJECTS= $(patsubst %.c, %.o, $(SOURCES))
+OBJECTS+= $(patsubst %.c, %.o, $(SOURCES))
 CC= avr-gcc
 
 FLASHDEV?= -c arduino -b 57600 -P /dev/ttyACM0
@@ -8,10 +8,10 @@ FLASHFLAGS+= -p $(CPU) -e $(FLASHDEV)
 CFLAGS+= -mmcu=$(CPU) -DF_CPU=$(FREQ)L
 CFLAGS+= -ffunction-sections -fdata-sections \
 	-fno-caller-saves -Os -Wall -Wextra -pedantic -Werror -Wshadow -Wstrict-overflow \
-	-fno-strict-aliasing -std=c11
+	-fno-strict-aliasing -std=c11 -static
 
 .PHONY: all
-all: $(PROGNAME).elf
+all: $(ATGTS) $(PROGNAME).elf
 
 .PHONY: clean
 clean:
@@ -21,5 +21,9 @@ clean:
 flash: $(PROGNAME).elf
 	$(FLASHPROG) $(FLASHFLAGS) -U flash:w:$(PROGNAME).elf
 
+.PHONY: fuse
+fuse:
+	$(FLASHPROG) $(FLASHFLAGS) $(FUSES)
+
 %.elf : $(OBJECTS)
-	$(CC) $(CFLAGS) -o $@ $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $(LIBS)
