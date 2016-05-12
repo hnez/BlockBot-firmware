@@ -2,6 +2,7 @@
 *.elf
 *~
 \#*
+ul_*
 __pycache__
 *.bc
 *.a
