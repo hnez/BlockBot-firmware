@@ -9,21 +9,18 @@
 #define UARTTX_PORT PORTB
 #define UARTTX_NUM  PB4
 
-const uint8_t uart_times[] PROGMEM = { //for 1.6MHz atTiny
-  2,  // Start bit
-  5, 8, 12, 15, 18, 21, 25, 28, // Data bits
-  31, // Stop bit
+
+const uint8_t uart_times[] PROGMEM = { //for 1.6MHz atTiny with clk/64
+  6,  // Start bit
+  20, 32, 46, 60, 72, 84, 100, 110, // Data bits
+  124, // Stop bit
 };
 
 void uart_putc(char c)
 {
   //Reset and start timer
   TCNT0=0x00;
-  //The Timer/Counter Register gives direct access, both for read and write operations, to the Timer/Counter unit 8- bit counter.
-  TCCR0B= _BV(CS02);
-  //The clock source is selected by the Clock Select logic which is controlled by the Clock Select (CS02:0)
-  //bits located in the Timer/Counter Control Register (TCCR0B).
-  //The Timer/Counter can be clocked directly by the system clock (by setting the CSn2:0 = 1).
+  TCCR0B= _BV(CS01) | _BV(CS00); //clk/64 prescale
 
   // merge in start (LOW) and stop (HIGH) bit
   uint16_t symbol=  _BV(9) | ((uint16_t)c << 1); // c wegen den shift int16

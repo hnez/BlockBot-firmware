@@ -22,21 +22,18 @@ const char my_code[10] = {
   "0123456789"
 };
 
-const uint8_t uart_times[] PROGMEM = { //for 1.6MHz atTiny
-  2,  // Start bit
-  5, 8, 12, 15, 18, 21, 25, 28, // Data bits
-  31, // Stop bit
+const uint8_t uart_times[] PROGMEM = { //for 1.6MHz atTiny with clk/64
+  6,  // Start bit
+  20, 32, 46, 60, 72, 84, 100, 110, // Data bits
+  124, // Stop bit
 };
 
 
 void uart_putc(char c){
   //Reset and start timer
   TCNT0=0x00;
-  //The Timer/Counter Register gives direct access, both for read and write operations, to the Timer/Counter unit 8- bit counter.
-  TCCR0B= _BV(CS02);
-  //The clock source is selected by the Clock Select logic which is controlled by the Clock Select (CS02:0)
-  //bits located in the Timer/Counter Control Register (TCCR0B).
-  //The Timer/Counter can be clocked directly by the system clock (by setting the CSn2:0 = 1).
+  TCCR0B= _BV(CS01) | _BV(CS00); //clk/64 prescale
+
 
   // merge in start (LOW) and stop (HIGH) bit
   uint16_t symbol=  _BV(9) | ((uint16_t)c << 1); // int16 weil 8 bits
@@ -73,9 +70,9 @@ void uart_puts(char *str){
 
 bool wait_for_byte(bool timeout){ // no timeout false
 
-  //if(!(RX_PIN&_BV(RX_NUM))){ //if low
-  //  return false; //no connection
-  //}
+  if(~RX_PIN&_BV(RX_NUM)){ //if low
+    return false; //no connection
+  }
 
   if(!timeout){ //no timeout
     while(RX_PIN&_BV(RX_NUM)); // while high
@@ -84,23 +81,24 @@ bool wait_for_byte(bool timeout){ // no timeout false
   } else { //timeout
 
     TCNT0=0x00; //set timer
-    TCCR0B= _BV(CS02); //set timersource
+    TCCR0B= _BV(CS01) || _BV(CS00); //clk/256
 
-    while(0xFA>TCNT0){
-      if(!(RX_PIN&_BV(RX_NUM))){
+    while(0xFD>TCNT0){
+      if(~RX_PIN&_BV(RX_NUM)){ //if low
+        TCCR0B= 0;
         return true;
       }
     }
+    TCCR0B= 0;
     return false;
   }
 }
 
 char uart_getc(void){
 
-  char byte = 0;
   uint16_t symbol = 0;
   TCNT0=0x00; //set timer
-  TCCR0B= _BV(CS02); //set timersource
+  TCCR0B= _BV(CS01) | _BV(CS00); //clk/64 prescale
   register uint8_t curtime;
 
   for(uint8_t i = 0;i<sizeof(uart_times);i++){
@@ -113,13 +111,9 @@ char uart_getc(void){
     }
   }
 
-  for(uint8_t j = 1;j<sizeof(uart_times)-1;j++){
-    if(symbol&_BV(j)){
-      byte|=_BV(j-1);
-    }
-  }
-
-  return byte;
+  //cut of start and stop bit
+  symbol>>=1;
+  return (char) (symbol&0xFF);
 }
 
 void uart_get(char * container){
@@ -134,7 +128,6 @@ void uart_get(char * container){
 }
 
 void uart_init(void){
-  DDRB|=_BV(PB1); //led
   TX_DDR|=_BV(TX_NUM); //put
   RX_DDR&=~_BV(RX_NUM); //get
 }
@@ -206,19 +199,17 @@ ISR(TIMER0_COMPA_vect){
   /* Byte recorded */
   if(I_time == sizeof(uart_times) - 1){
 
+    /* Stop counting */
+    TCCR0B= 0;
+    /* reset timer */
+    TCNT0=0x00;
+
     /* If endbit is high             and            startbit is low -> byte OK */
     if((I_symbol_In & _BV(sizeof(uart_times)-1)) && (~I_symbol_In & _BV(0))){
 
-      char I_byte = 0; // The final byte
-
-      /* make byte */
-      for(uint8_t I_j = 1;I_j<sizeof(uart_times)-1;I_j++){
-        if(I_symbol_In&_BV(I_j)){
-          I_byte|=_BV(I_j-1);
-        }
-      }
-
-      push(&buffer, I_byte);
+      /* Cut off start and stop bit and push */
+      I_symbol_In>>=1;
+      push(&buffer, (char) (I_symbol_In&0xFF));
       /* May react to overflow? */
 
 
@@ -230,15 +221,15 @@ ISR(TIMER0_COMPA_vect){
 
     /* Jump to next byte */
     I_time = 0;
-    /* reset timer */
-    TCNT0=0x00;
-    TCCR0B= _BV(CS02);
+    OCR0A = pgm_read_byte(&(uart_times[I_time]));
+    TCCR0B= _BV(CS01) | _BV(CS00) | _BV(WGM01) | _BV(WGM00); //clk/64 prescale, CTC-Mode Page 72
   } else {
     I_time++;
+    /* Seite 80 Output Compare Register A */
+    OCR0A = pgm_read_byte(&(uart_times[I_time])) - pgm_read_byte(&(uart_times[I_time-1]));
   }
 
-  /* Seite 80 Output Compare Register A */
-  OCR0A = pgm_read_byte(&(uart_times[I_time]));
+
 }
 
 
@@ -266,7 +257,7 @@ int main (void){ //TODO
     if(wait_for_byte(false)){
 
       TCNT0=0x00;
-      TCCR0B= _BV(CS02);
+      TCCR0B= _BV(CS01) | _BV(CS00) | _BV(WGM01) | _BV(WGM00); //clk/64 prescale, CTC-Mode Page 72
 
       /* set Global Interrupt Enable */
       sei(); /* SREG |=_BV(I) ist das gleiche */
