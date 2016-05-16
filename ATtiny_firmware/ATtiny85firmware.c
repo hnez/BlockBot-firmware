@@ -146,10 +146,6 @@ void baud_init(void){
 }
 
 void interrupts_init(void){
-
-  /* Seite 80 Output Compare Register A */
-  OCR0A = pgm_read_byte(&(uart_times[0]));
-
   /* Seite 81 Timer/Counter Interrupt Mask Register */
   TIMSK = _BV(OCIE0A); /* Timer/Counter0 Output Compare Match A Interrupt Enable */
 }
@@ -233,7 +229,7 @@ ISR(TIMER0_COMPA_vect){
 }
 
 
-int main (void){ //TODO
+int main (void){
   baud_init();
   uart_init();
   interrupts_init();
@@ -256,7 +252,10 @@ int main (void){ //TODO
     /* Dashier könnte ich auch mit einem Pin Change Interrupt machen */
     if(wait_for_byte(false)){
 
-      TCNT0=0x00;
+      /* Seite 80 Output Compare Register A */
+      OCR0A = pgm_read_byte(&(uart_times[0]));
+
+      TCNT0=0x00; //reset timer
       TCCR0B= _BV(CS01) | _BV(CS00) | _BV(WGM01) | _BV(WGM00); //clk/64 prescale, CTC-Mode Page 72
 
       /* set Global Interrupt Enable */
