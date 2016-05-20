@@ -1,10 +1,14 @@
-
 #include <avr/io.h>
+#include <avr/interrupt.h>
+#include <avr/pgmspace.h> /* uart_times */
 #include <util/delay.h>
-#include <avr/pgmspace.h>
-#include <stdbool.h> //könnte man um bytes zu sparen auch alles mit ints machen
+#include <stdbool.h>
+#include "queue.h" /* buffer */
 
-/* atTiny85 */
+/* buffer size */
+#define count 50
+
+/* For ATtiny85 */
 #define TX_DDR  DDRB
 #define TX_PORT PORTB
 #define TX_NUM  PB4
@@ -12,6 +16,11 @@
 #define RX_DDR  DDRB
 #define RX_PIN  PINB
 #define RX_NUM  PB3
+
+const char my_code[10] = {
+  //'0','1','2','3','4','5','6','7','8','9',
+  "0123456789"
+};
 
 const uint8_t uart_times[] PROGMEM = { //for 1.6MHz atTiny with clk/64
   6,  // Start bit
@@ -105,8 +114,6 @@ char uart_getc(void){
   //cut of start and stop bit
   symbol>>=1;
   return (char) (symbol&0xFF);
-
-  //return byte;
 }
 
 void uart_get(char * container){
@@ -138,17 +145,116 @@ void baud_init(void){
   CLKPR &= ~( _BV(CLKPS3) | _BV(CLKPS2) | _BV(CLKPS1) | _BV(CLKPS0) | _BV(CLKPCE) );
 }
 
+uint8_t I_time; // The current time of uart_times
+uint16_t I_symbol_In; // The currently incoming symbol
+uint16_t I_symbol_Out; // The currently outgoing symbol
+struct queue_t buffer;
+bool buffer_empty;
+
+void interrupts_init(void){
+  /* Seite 81 Timer/Counter Interrupt Mask Register */
+  TIMSK = _BV(OCIE0A); /* Timer/Counter0 Output Compare Match A Interrupt Enable */
+  I_time = 0;
+  I_symbol_In = 0;
+  I_symbol_Out = 0;
+  buffer_empty = false;
+}
+
+ISR(TIMER0_COMPA_vect){
+
+  if(I_time==0){
+
+    //make symbol_Out
+    I_symbol_Out = _BV(sizeof(uart_times)-1) | ((uint16_t)pop(&buffer) << 1);
+
+    /* clear last symbol_In */
+    I_symbol_In = 0;
+  }
+
+  /* receiving */
+  if(RX_PIN&_BV(RX_NUM)){ //high
+    I_symbol_In |= _BV(I_time);
+  }
+
+  /* transmitting */
+  if (I_symbol_Out & 0x1) {
+    TX_PORT|= _BV(TX_NUM);
+  } else {
+    TX_PORT&=~_BV(TX_NUM);
+  }
+  /* Cut off last bit */
+  I_symbol_Out>>=1;
+
+
+  /* Byte recorded */
+  if(I_time == sizeof(uart_times)-1){
+    /* Stop counting */
+    TCCR0B= 0;
+    /* reset timer */
+    TCNT0=0x00;
+
+    /* init next byte */
+    I_time = 0;
+    OCR0A = pgm_read_byte(&(uart_times[I_time]));
+
+    /* If endbit is high             and            startbit is low -> byte OK */
+    if((I_symbol_In & _BV(sizeof(uart_times)-1)) && (~I_symbol_In & _BV(0))){
+
+      /* Cut off start and stop bit and push */
+      I_symbol_In>>=1;
+      push(&buffer, (char) (I_symbol_In&0xFF));
+
+      /* wait for next byte with timeout */
+      wait_for_byte(true);
+    } else {
+      _delay_us(65);
+    }
+    if(buffer_size(&buffer)!=0){
+      TCCR0B= _BV(CS01) | _BV(CS00) | _BV(WGM01) | _BV(WGM00); //clk/64 prescale, CTC-Mode Page 72
+    }
+  } else {
+    I_time++;
+    /* Page 80 Output Compare Register A */
+    OCR0A = pgm_read_byte(&(uart_times[I_time])) - pgm_read_byte(&(uart_times[I_time-1]));
+  }
+}
+
+
 int main (void){
   baud_init();
   uart_init();
+  interrupts_init();
+  queue_init(&buffer);
 
-  char msg[20];
-  for (;;) {
-    if(wait_for_byte(false)){
-      uart_get(&msg[0]);
-      uart_puts(msg);
-      for(uint8_t xx=0;xx<sizeof(msg);xx++)
-        msg[xx]=0; // I dont want to import string.h for memset
+  for(;;){
+
+    /* Wait until buffer is empty */
+    while(buffer_size(&buffer)>0);
+    _delay_ms(15); //Finish last cycle
+
+
+    cli();
+
+
+    for(uint8_t M_i=0;M_i<sizeof(my_code);M_i++){
+      push(&buffer, my_code[M_i]);
     }
+    buffer_empty = false;
+    I_time = 0;
+
+    if(wait_for_byte(false)){
+
+      /* Page 80 Output Compare Register A */
+      OCR0A = pgm_read_byte(&(uart_times[0]));
+
+      TCNT0=0x00; //reset timer
+      TCCR0B= _BV(CS01) | _BV(CS00) | _BV(WGM01) | _BV(WGM00); //clk/64 prescale, CTC-Mode Page 72
+
+      /* set Global Interrupt Enable */
+      sei();
+    }
+
+    /* Other code */
+
   }
 }

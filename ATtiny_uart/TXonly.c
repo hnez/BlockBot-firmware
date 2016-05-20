@@ -1,10 +1,11 @@
-//Hauptsächlich Leonards Code mit Kommentaren von Lenard fur Lenard
-/* Useful for debugging */
+//----------------------------------------------------------------------
+//                    /* Useful for debugging */
+//----------------------------------------------------------------------
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/pgmspace.h>
 
-/* atTiny85 */
+/* ATtiny85 */
 #define UARTTX_DDR  DDRB
 #define UARTTX_PORT PORTB
 #define UARTTX_NUM  PB4
@@ -18,21 +19,21 @@ const uint8_t uart_times[] PROGMEM = { //for 1.6MHz atTiny with clk/64
 
 void uart_putc(char c)
 {
-  //Reset and start timer
+
   TCNT0=0x00;
   TCCR0B= _BV(CS01) | _BV(CS00); //clk/64 prescale
 
   // merge in start (LOW) and stop (HIGH) bit
-  uint16_t symbol=  _BV(9) | ((uint16_t)c << 1); // c wegen den shift int16
-                   //HIGH9    c als int  LOW0
+  uint16_t symbol=  _BV(9) | ((uint16_t)c << 1);
+
   for (uint8_t i=0;i<sizeof(uart_times);i++) {
     register uint8_t curtime;
-    //for heavy use, Sollte der compiler selber machen
+
 
     curtime= pgm_read_byte(&(uart_times[i]));
-    //macht byte weil TCNT0 in byte ist
 
-    // wait for timer
+
+
     while (TCNT0<curtime);
 
     if (symbol & 0x01) {
@@ -41,7 +42,7 @@ void uart_putc(char c)
     else {
       UARTTX_PORT&=~_BV(UARTTX_NUM);
     }
-    symbol>>=1; // Schneidet das Ende ab
+    symbol>>=1;
   }
 
   // stop timer
