@@ -17,10 +17,11 @@
 #define RX_PIN  PINB
 #define RX_NUM  PB3
 
-const char my_code[10] = {
+const char my_code[7] = {
   //'0','1','2','3','4','5','6','7','8','9',
-  "0123456789"
+  "ABCDEFG"
 };
+
 
 const uint8_t uart_times[] PROGMEM = { //for 1.6MHz atTiny with clk/64
   6,  // Start bit
@@ -30,13 +31,12 @@ const uint8_t uart_times[] PROGMEM = { //for 1.6MHz atTiny with clk/64
 
 
 void uart_putc(char c){
-  //Reset and start timer
   TCNT0=0x00;
   TCCR0B= _BV(CS01) | _BV(CS00); //clk/64 prescale
 
 
 
-  uint16_t symbol=  _BV(9) | ((uint16_t)c << 1); // int16 weil 8 bits
+  uint16_t symbol=  _BV(9) | ((uint16_t)c << 1);
 
   for (uint8_t i=0;i<sizeof(uart_times);i++) {
     register uint8_t curtime;
@@ -57,7 +57,7 @@ void uart_putc(char c){
     symbol>>=1;
   }
 
-  // stop timer
+
   TCCR0B= 0;
 }
 
@@ -79,6 +79,7 @@ bool wait_for_byte(bool timeout){ // no timeout false
     return true;
 
   } else { //timeout
+    uint8_t TCNT0_temp = TCNT0;
 
     TCNT0=0x00; //set timer
     TCCR0B= _BV(CS01) || _BV(CS00); //clk/256
@@ -86,10 +87,12 @@ bool wait_for_byte(bool timeout){ // no timeout false
     while(0xFD>TCNT0){
       if(~RX_PIN&_BV(RX_NUM)){ //if low
         TCCR0B= 0;
+        TCNT0 = TCNT0_temp;
         return true;
       }
     }
     TCCR0B= 0;
+    TCNT0 = TCNT0_temp;
     return false;
   }
 }
@@ -130,6 +133,7 @@ void uart_get(char * container){
 void uart_init(void){
   TX_DDR|=_BV(TX_NUM); //put
   RX_DDR&=~_BV(RX_NUM); //get
+  TX_PORT |= _BV(TX_NUM); // init high
 }
 
 void baud_init(void){
@@ -149,7 +153,6 @@ uint8_t I_time; // The current time of uart_times
 uint16_t I_symbol_In; // The currently incoming symbol
 uint16_t I_symbol_Out; // The currently outgoing symbol
 struct queue_t buffer;
-bool buffer_empty;
 
 void interrupts_init(void){
   /* Seite 81 Timer/Counter Interrupt Mask Register */
@@ -157,7 +160,6 @@ void interrupts_init(void){
   I_time = 0;
   I_symbol_In = 0;
   I_symbol_Out = 0;
-  buffer_empty = false;
 }
 
 ISR(TIMER0_COMPA_vect){
@@ -165,7 +167,8 @@ ISR(TIMER0_COMPA_vect){
   if(I_time==0){
 
     //make symbol_Out
-    I_symbol_Out = _BV(sizeof(uart_times)-1) | ((uint16_t)pop(&buffer) << 1);
+    //I_symbol_Out = _BV(sizeof(uart_times)-1) | ((uint16_t)pop(&buffer) << 1);
+
 
     /* clear last symbol_In */
     I_symbol_In = 0;
@@ -177,13 +180,13 @@ ISR(TIMER0_COMPA_vect){
   }
 
   /* transmitting */
-  if (I_symbol_Out & 0x1) {
-    TX_PORT|= _BV(TX_NUM);
-  } else {
-    TX_PORT&=~_BV(TX_NUM);
-  }
-  /* Cut off last bit */
-  I_symbol_Out>>=1;
+  // if (I_symbol_Out & 0x1) {
+  //   TX_PORT|= _BV(TX_NUM);
+  // } else {
+  //   TX_PORT&=~_BV(TX_NUM);
+  // }
+  // /* Cut off last bit */
+  // I_symbol_Out>>=1;
 
 
   /* Byte recorded */
@@ -210,12 +213,23 @@ ISR(TIMER0_COMPA_vect){
       _delay_us(65);
     }
     if(buffer_size(&buffer)!=0){
-      TCCR0B= _BV(CS01) | _BV(CS00) | _BV(WGM01) | _BV(WGM00); //clk/64 prescale, CTC-Mode Page 72
+      //TCNT0=0x00; /*wait for byte changes this*/
+      TCCR0B= _BV(CS01) | _BV(CS00);
     }
   } else {
     I_time++;
-    /* Page 80 Output Compare Register A */
-    OCR0A = pgm_read_byte(&(uart_times[I_time])) - pgm_read_byte(&(uart_times[I_time-1]));
+    /* Seite 80 Output Compare Register A */
+    OCR0A = pgm_read_byte(&(uart_times[I_time]));
+  }
+
+  /* DEBUG!!!! */
+  if(buffer_size(&buffer)>16){
+    PORTB ^= _BV(PB0);
+    char str[20] = {0};
+    for(int aa = 0;0<buffer_size(&buffer);aa++){
+      str[aa] = pop(&buffer);
+    }
+    uart_puts(str);
   }
 }
 
@@ -225,34 +239,35 @@ int main (void){
   uart_init();
   interrupts_init();
   queue_init(&buffer);
+  DDRB |= _BV(PB0);
 
   for(;;){
-
-    /* Wait until buffer is empty */
-    while(buffer_size(&buffer)>0);
-    _delay_ms(15); //Finish last cycle
-
-
-    cli();
 
 
     for(uint8_t M_i=0;M_i<sizeof(my_code);M_i++){
       push(&buffer, my_code[M_i]);
     }
-    buffer_empty = false;
     I_time = 0;
+
 
     if(wait_for_byte(false)){
 
-      /* Page 80 Output Compare Register A */
+      /* Seite 80 Output Compare Register A */
       OCR0A = pgm_read_byte(&(uart_times[0]));
 
       TCNT0=0x00; //reset timer
       TCCR0B= _BV(CS01) | _BV(CS00) | _BV(WGM01) | _BV(WGM00); //clk/64 prescale, CTC-Mode Page 72
 
-      /* set Global Interrupt Enable */
+
       sei();
     }
+
+    /* Wait until buffer is empty */
+    while(buffer_size(&buffer)>0);
+    _delay_ms(15); //Finish last cycle
+
+    /* Disable interrupts */
+    cli();
 
     /* Other code */
 
