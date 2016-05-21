@@ -82,7 +82,7 @@ int main (void)
 
 
   for (;;) {
-    uart_puts("QRSTUVWXYZ");
+    uart_puts("UU");
     _delay_ms(1000);
 
   }
