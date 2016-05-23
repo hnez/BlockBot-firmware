@@ -130,6 +130,78 @@ class ProtoBase(object):
     def place(self, position):
         self.position= position
 
+class ProtoDirective(ProtoBase):
+    def match_name(self, line):
+        name = line.split(' ')[0][1:]
+
+        if (self.name != name):
+            raise DecodeException('low', '{} does not match {}'.format(self.name, name))
+
+    def __init__(self, program, line):
+        self.program= program
+
+        if isinstance(line, bytes):
+            raise DecodeException('low', 'Directives are not present in bytecode')
+
+        if isinstance(line, str):
+            self.match_name(line)
+
+            self.parse_parameters(line.split(' ')[1:])
+
+            return
+
+        raise Exception('Incompatible input type')
+
+class DirectiveBrickName (ProtoDirective):
+    name= 'brkname'
+
+    def parse_parameters(self, parms):
+        self.program.meta['Name']= ' '.join(parms)
+
+    def __len__(self):
+        return 0
+
+    def __bytes__(self):
+        return (bytes([]))
+
+    def __str__(self):
+        return ('.brkname' + self.program.meta['Name'])
+
+
+class DirectiveParameter (ProtoDirective):
+    name= 'brkparm'
+
+    def parse_parameters(self, parms):
+        if len(parms) != 2:
+            text= '{} takes two parameters (parm_num default) but received {}'
+
+            DecodeException('high', text.format(self.name, len(parms)))
+
+        try:
+            self.parm_num, self.default= tuple(map(int, parms))
+
+        except ValueError:
+            text= '{} takes two integer parameters (parm_num default)'
+
+            DecodeException('high', text.format(self.name))
+
+        if 'Parms' not in self.program.meta:
+            self.program.meta['Parms']= dict()
+
+        if self.parm_num not in self.program.meta['Parms']:
+            self.program.meta['Parms'][self.parm_num]= list()
+
+        self.program.meta['Parms'][self.parm_num].append(self)
+
+    def __len__(self):
+        return 0
+
+    def __bytes__(self):
+        return (bytes([self.default]))
+
+    def __str__(self):
+        return ('.{} {} {}',  self.name, self.parm_num, self.default)
+
 class ProtoCmd (ProtoBase):
     specfmt= '{: ^13}| {:11}| {}'
     disasmfmt= '    {:16} // {}'
@@ -491,7 +563,7 @@ def list_decoders():
     decoders=[]
     globpairs= globals().items()
 
-    for pr in ['Cmd', 'Alias', 'Const']:
+    for pr in ['Directive', 'Cmd', 'Alias', 'Const']:
         decoders.extend(d[1] for d in globpairs
                         if d[0].startswith(pr))
 

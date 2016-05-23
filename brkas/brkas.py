@@ -55,10 +55,35 @@ class DecodeExeCollection(Exception):
 
         return (errs)
 
+class MessageContainer(object):
+    BRICK_CONT= 0x0100
+    BRICK_NAME= 0x0101
+    BRICK_BC=   0x0102
+    BRICK_PREP= 0x0103
+
+    def __init__ (self, typefield, payload):
+        self.typefield= typefield
+        self.payload= bytes(payload)
+
+    def __bytes__ (self):
+        if self.typefield > 0xffff:
+            raise Exception('Typefield ({}) is bigger than 0xffff'.format(self.typefield))
+
+        length= len(self.payload)
+
+        if length > 0xffff:
+            raise Exception('Length {} is bigger than 0xffff'.format(self.typefield))
+
+        tpfld= bytes([(self.typefield>>8) & 0xff, self.typefield & 0xff])
+        lefld= bytes([(length>>8) & 0xff, length & 0xff])
+
+        return (tpfld + lefld + self.payload)
+
 class Program(object):
     def __init__(self):
-        self.labels={}
-        self.ops=[]
+        self.labels=dict()
+        self.ops=list()
+        self.meta=dict()
 
     def _lines_from_text(self, text):
         lines= text.split('\n')
@@ -95,7 +120,7 @@ class Program(object):
     def _decode_bytecode(self, op):
         addr, inst= op
 
-        exe= DecodeExeCollection(hex(inst), addr)
+        exe= DecodeExeCollection(hex(inst[0]), addr)
 
         for dc in decoders:
             try:
@@ -153,6 +178,45 @@ class Program(object):
         fd.write(self.to_bytecode())
         fd.close()
 
+    def to_brickstorage(self):
+        bc= self.to_bytecode()
+
+        pkgs=list()
+
+        if 'Name' in self.meta:
+            pkgs.append(MessageContainer(
+                MessageContainer.BRICK_NAME,
+                bytes(self.meta['Name'], encoding='utf-8')))
+
+        if 'Parms' in self.meta:
+            for pnum, ps in self.meta['Parms'].items():
+                repaddrs= list()
+                repaddrs.append(bytes([pnum >> 8, pnum & 0xff]))
+                repaddrs.extend(bytes([p.position >> 8, p.position & 0xff]) for p in ps)
+
+                repraw= bytes()
+                for r in repaddrs:
+                    repraw+= r
+
+                pkgs.append(MessageContainer(
+                    MessageContainer.BRICK_PREP,
+                    repraw))
+
+        pkgs.append(MessageContainer(MessageContainer.BRICK_BC, bc))
+
+        brickraw= bytes()
+        for p in pkgs:
+            brickraw+= bytes(p)
+
+        brick= MessageContainer(MessageContainer.BRICK_CONT, brickraw)
+
+        return (bytes(brick))
+
+    def to_brickstoragefile(self, path):
+        fd= open(path, 'wb')
+        fd.write(self.to_brickstorage())
+        fd.close()
+
     @classmethod
     def to_specification(cls):
         opal= filter(lambda o: 'opcode' in o.__dict__, decoders)
@@ -173,6 +237,8 @@ class Program(object):
         fd.write(cls.to_specification())
         fd.close()
 
+prog= Program()
+
 def main(args):
     if (len(args) == 0 or len(args) % 2 != 0):
         lines= []
@@ -182,6 +248,7 @@ def main(args):
         lines.append(' bytecode_in bytecode.bc            - Bytecode output file')
         lines.append(' source_out sourcefile.brkas        - Disassembly file')
         lines.append(' bytecode_out bytecode.bc           - Assembly file')
+        lines.append(' brickfile_out brickfile.brf        - Flashable brick file')
         lines.append(' specification_out specification.md - Bytecode specification')
         lines.append('')
         lines.append('example:')
@@ -192,7 +259,6 @@ def main(args):
         return
 
     parms= dict(zip(args[0::2],args[1::2]))
-    prog= Program()
 
     try:
         if ('source_in' in parms):
@@ -206,6 +272,9 @@ def main(args):
 
         if ('bytecode_out' in parms):
             prog.to_bytecodefile(parms['bytecode_out'])
+
+        if ('brick_out' in parms):
+            prog.to_brickstoragefile(parms['brick_out'])
 
         if ('specification_out' in parms):
             prog.to_specificationfile(parms['specification_out'])
