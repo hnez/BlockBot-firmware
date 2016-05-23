@@ -24,7 +24,7 @@ delay:
     LD RC           // Load driving time
     .brkparm 0 60   // Instruct the brick firmware to replace this byte with
                     // potentiometer parameter 0.
-                    // Default to 60 if parameter 0 is not awailable
+                    // Default to 60 if parameter 0 is not available
     STA Timer RC    // Start timer
 
 delaylp:
