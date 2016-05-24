@@ -1,11 +1,12 @@
 OBJECTS+= $(patsubst %.c, %.o, $(SOURCES))
 CC= avr-gcc
+HOSTCC?= gcc
 
 FLASHDEV?= -c arduino -b 57600 -P /dev/ttyACM0
 FLASHPROG= avrdude
 FLASHFLAGS+= -p $(CPU) -e $(FLASHDEV)
 
-CFLAGS+= -mmcu=$(CPU) -DF_CPU=$(FREQ)L
+AVRCFLAGS+= -mmcu=$(CPU) -DF_CPU=$(FREQ)L
 CFLAGS+= -ffunction-sections -fdata-sections \
 	-fno-caller-saves -Os -Wall -Wextra -pedantic -Werror -Wshadow -Wstrict-overflow \
 	-fno-strict-aliasing -std=c11 -static
@@ -25,5 +26,11 @@ flash: $(PROGNAME).elf
 fuse:
 	$(FLASHPROG) $(FLASHFLAGS) $(FUSES)
 
+.PHONY: tests
+tests:
+	$(HOSTCC) $(CFLAGS) -o tests tests.c
+	./tests
+	rm tests
+
 %.elf : $(OBJECTS)
-	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $(LIBS)
+	$(CC) $(AVRCFLAGS) $(CFLAGS) -o $@ $(OBJECTS) $(LIBS)

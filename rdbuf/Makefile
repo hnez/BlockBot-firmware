@@ -11,6 +11,6 @@ librdbuf.$(CPU)-$(FREQ).a: $(patsubst %.c, %.$(CPU)-$(FREQ).o, $(SOURCES))
 	$(AR) rcs $@ $^
 
 %.$(CPU)-$(FREQ).o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $^
+	$(CC) $(AVCFLAGS) $(CFLAGS) -c -o $@ $^
 
 include ../Makefile.include

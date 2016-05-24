@@ -11,6 +11,6 @@ libbrkvm.$(CPU)-$(FREQ).a: $(patsubst %.c, %.$(CPU)-$(FREQ).o, $(SOURCES))
 	$(AR) rcs $@ $^
 
 %.$(CPU)-$(FREQ).o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $^
+	$(CC) $(AVRCFLAGS) $(CFLAGS) -c -o $@ $^
 
 include ../Makefile.include
