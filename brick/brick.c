@@ -11,7 +11,10 @@
 
 int main (void)
 {
-  
-  
+  uart_init();
+  sei();
+  for(;;){
+
+  }
   return (0);
 }

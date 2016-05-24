@@ -152,7 +152,7 @@ void eval_byte(){
       I_symbol_Out = _BV(9) | ((uint16_t)packet_head_Out[2] << 1); //packet_legth Part 1
       /* Handle things except AQ */
     }
-  } else if(UART_mode==RX_CKSUM){
+  } else if(UART_mode==RX_CKSUM) {
 
     if(packet_index_In==4){
       packet_head_In[packet_index_In] = byte;
