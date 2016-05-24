@@ -36,8 +36,11 @@ struct {
   struct rdbuf_t buf;
   uint16_t passive_len; /* Number of bytes to stay in
                            passively clocked mode for */
-  uint16_t active_len; /* Number of bytes to stay in
-                          actively clocked mode for */
+  uint16_t active_len;  /* Number of bytes to stay in
+                          actively clocked mode for
+                          TODO may remove later because
+                          there is no need to keep it*/
+  uint16_t total_len;  /* guess it */
   uint8_t bitnum;
   uint16_t packet_index; /* The current position in a
                             packet transmission */
@@ -132,11 +135,10 @@ ISR(PCINT0_vect)
     }
     if(uart_status.packet_index==4){
       /* eval packet length */
-      uart_status.passive_len
       uart_status.active_len = (uint16_t)(uart_status.packet_header_rcvd[2] << 8) | (uint16_t)(uart_status.packet_header_rcvd[3]);
-      uint16_t total_len = passive_len + active_len; /* If AQ, CKSUM_len is already in active_len */
-      uart_status.packet_header_send[2] = (uint8_t) (total_len >> 8);
-      uart_status.packet_header_send[3] = (uint8_t) (total_len & 0xFF);
+      uart_status.total_len = passive_len + active_len; /* If AQ, CKSUM_len is already in active_len */
+      uart_status.packet_header_send[2] = (uint8_t) (uart_status.total_len >> 8);
+      uart_status.packet_header_send[3] = (uint8_t) (uart_status.total_len & 0xFF);
     }
     /* Check if header is rcvd */
     if (uart_status.packet_index>=4) {
