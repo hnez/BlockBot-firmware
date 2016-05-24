@@ -4,6 +4,9 @@
   #include <avr/interrupt.h>
   #include <avr/pgmspace.h>
 
+  #include <string.h>
+  #define bzero(dst, size) memset(dst, 0, size)
+
   #include <rdbuf.h>
 #endif
 
@@ -18,7 +21,7 @@
 
 #define UA_TMR_PRESCALE_REG (_BV(CS01) | _BV(CS00))
 #define UA_TMR_PRESCALE_NUM 64
-#define UA_HDR_LEN (4)
+#define UA_HDR_LEN (6)
 
 #define BAUD_RATE 9600
 
@@ -44,10 +47,10 @@ struct {
   uint8_t bitnum;
   uint16_t packet_index; /* The current position in a
                             packet transmission */
-  char packet_header_rcvd[6]; /* The received header
-                                 of the previous block */
-  char packet_header_send[6]; /* The header for the next
-                                 block */
+  char packet_header_rcvd[UA_HDR_LEN]; /* The received header
+                                          of the previous block */
+  char packet_header_send[UA_HDR_LEN]; /* The header for the next
+                                          block */
   /*
    * The structure below encodes the current
    * state the software UART is in.
@@ -115,43 +118,61 @@ ISR(PCINT0_vect)
     uart_status.flags.snding_header= 0;
 
     uart_status.packet_index = 0;
-    for(int i=0;i<6;i++) uart_status.packet_header_rcvd[i] = 0;
-    for(int i=0;i<6;i++) uart_status.packet_header_send[i] = 0;
+    bzero(uart_status.packet_header_rcvd, UA_HDR_LEN);
+    bzero(uart_status.packet_header_send, UA_HDR_LEN);
     uart_status.passive_len= UA_HDR_LEN;
-
   }
   else if (uart_status.packet_index<=1) {}  /* Not enough data to do anything */
   else if (uart_status.flags.transmission && uart_status.flags.snding_header) {
 
     if (uart_status.packet_index==2) {
       /* eval Mnemonic */
-      if (uart_status.packet_header_rcvd[0]==0x0 && uart_status.packet_header_rcvd[0]==[1]==0x1) { /* rcvd AQ */
-        uart_status.packet_header_send[0]=0x0 /* send AQ */
-        uart_status.packet_header_send[1]=0x1 /* send AQ */
+      if (uart_status.packet_header_rcvd[0]==0x0
+          && uart_status.packet_header_rcvd[1]==0x1) { /* rcvd AQ req */
+        uart_status.packet_header_send[0]=0x0; /* send AQ */
+        uart_status.packet_header_send[1]=0x1; /* send AQ */
         uart_status.flags.snding_header= 1;
         uart_status.flags.forward= 1;
       }
-      /* TODO Handle things except AQ #Leonard */
+      /* TODO Handle things except AQ like brick reprogramming
+         but other features are considered optional for now. */
     }
-    if(uart_status.packet_index==4){
+
+    if(uart_status.packet_index==4) {
       /* eval packet length */
-      uart_status.active_len = (uint16_t)(uart_status.packet_header_rcvd[2] << 8) | (uint16_t)(uart_status.packet_header_rcvd[3]);
-      uart_status.total_len = passive_len + active_len; /* If AQ, CKSUM_len is already in active_len */
+      uart_status.active_len = (uint16_t)(uart_status.packet_header_rcvd[2] << 8)
+        | (uint16_t)(uart_status.packet_header_rcvd[3]);
+
+      uart_status.total_len = uart_status.passive_len +
+        uart_status.active_len;
+      /* If AQ, CKSUM_len is already in active_len */
+
       uart_status.packet_header_send[2] = (uint8_t) (uart_status.total_len >> 8);
       uart_status.packet_header_send[3] = (uint8_t) (uart_status.total_len & 0xFF);
     }
+
     /* Check if header is rcvd */
     if (uart_status.packet_index>=4) {
-      if (uart_status.packet_header_rcvd[0]==0x0 && uart_status.packet_header_rcvd[0]==[1]==0x1) {
+      if (uart_status.packet_header_rcvd[0]==0x00
+          && uart_status.packet_header_rcvd[1]==0x01) {
         /* rcvd AQ */
         if (uart_status.packet_index==6) {
           /* cksum rcvd */
           uart_status.flags.rcving_header = 0;
-          /* TODO Create new CKSUM
-          received CKSUM in
-          uart_status.packet_header_rcvd[4] and
-          uart_status.packet_header_rcvd[5]
-          */
+
+          /* TODO Calculate new CKSUM (see IP checksum for refernce):
+           * uint32_t sum;
+           * for (uint16_t i; i<payloadlen; i++) {
+           *   sum+= payload[i];
+           * }
+           * while (sum >> 16) {
+           *   sum += sum >> 16;
+           * }
+           * newsum= (uint16_t)oldsum - (uint16_t)sum;
+           * uart_status.packet_header_send[4] = newsum>>8;
+           * uart_status.packet_header_send[5] = newsum;
+           */
+
           uart_status.packet_header_send[4] = 0;
           uart_status.packet_header_send[5] = 0;
         }
@@ -187,7 +208,6 @@ ISR(TIMER0_COMPA_vect)
         uart_status.flags.forward= 0;
       }
       else {
-
         // Forward the start bit if forwarding is requested
         TX_PORT&= ~_BV(TX_NUM);
       }
@@ -195,7 +215,7 @@ ISR(TIMER0_COMPA_vect)
     else if (uart_status.flags.snding_header && uart_status.flags.forward) {
       /* Handle Mnemonic, Length, optional Checksum */
       if(uart_status.packet_index > 2){
-        b_send = uart_status.snding_header[uart_status.packet_index-3];
+        b_send = uart_status.packet_header_send[uart_status.packet_index-3];
       } /* else { dont send because uart_status.flags.forward==0 } */
     }
   }
@@ -206,12 +226,15 @@ ISR(TIMER0_COMPA_vect)
     }
 
     if (RX_PIN & _BV(RX_NUM)) {
-      /* TODO What if the stopbit was passed due to #USBSerialConvertersSuck? */
-      // verify that a correct stop bit was received
+      /* TODO handle case where no stop bit was received due to
+       * #USBSerialConvertersSuck
+       * Maybe don't even check for stop bit and push
+       * after the 8. data bit is received */
 
+      // verify that a correct stop bit was received
       if (!uart_status.flags.rcving_header) {
-        /* This is the reason why two seperate headerflags are nessessary */
-        /* The header is not meant for the buffer */
+        /* This is the reason why two seperate headerflags are nessessary
+         * The header is not meant for the buffer */
         if (rdbuf_push(&uart_status.buf, b_rcvd) < 0) {
           // The buffer is full. This should not happen
 
@@ -221,7 +244,7 @@ ISR(TIMER0_COMPA_vect)
         }
       }
       else {
-        uart_status.packet_header_rcvd[packet_index-1] = b_rcvd;
+        uart_status.packet_header_rcvd[uart_status.packet_index-1] = b_rcvd;
       }
     }
 
