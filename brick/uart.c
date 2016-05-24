@@ -265,7 +265,7 @@ ISR(TIMER0_COMPA_vect)
         TCCR0B= 0;
         _delay_us(65);
 
-        /* See Pin Change Interrupt for comments TODO May create a function? */
+        /* See Pin Change Interrupt for comments */
         OCR0A= pgm_read_byte(&uart_times[0]);
         TIMSK|= _BV(OCIE0A);
         TCNT0= 0;
