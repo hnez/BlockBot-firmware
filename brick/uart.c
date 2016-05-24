@@ -36,8 +36,15 @@ struct {
   struct rdbuf_t buf;
   uint16_t passive_len; /* Number of bytes to stay in
                            passively clocked mode for */
+  uint16_t active_len; /* Number of bytes to stay in
+                          actively clocked mode for */
   uint8_t bitnum;
-
+  uint16_t packet_index; /* The current position in a
+                            packet transmission */
+  char packet_header_rcvd[6]; /* The received header
+                                 of the previous block */
+  char packet_header_send[6]; /* The header for the next
+                                 block */
   /*
    * The structure below encodes the current
    * state the software UART is in.
@@ -50,14 +57,18 @@ struct {
    *  forward       - is set, when for every received byte a byte should be
    *                  transmitted.
    *                  e.g. when forwarding a aquisition request
-   *  header        - is set, when the packet length is jet to be determined
-   *                  e.g. not enough bytes of the header where received yet.
+   *  rcving_header - is set while receiving header from previous block
+   *  snding_header - is set while sending header
+   *                  this is nessessary because snding_header takes two bytes
+   *                  longer than rcving_header. It makes the code much more
+   *                  comprehensible
    */
   struct {
     uint8_t transmission : 1;
     uint8_t active_clock : 1;
     uint8_t forward : 1;
-    uint8_t header : 1;
+    uint8_t rcving_header : 1;
+    uint8_t snding_header : 1;
   } flags;
 } uart_status;
 
@@ -77,9 +88,9 @@ ISR(PCINT0_vect)
   // Reset and start the bit timer
   // And enable the overflow interrupt
   OCR0A= pgm_read_byte(&uart_times[0]);
-  TIMSK|= _BV(OCIE0A);
+  TIMSK|= _BV(OCIE0A); /* Timer/Counter0 Output Compare Match A Interrupt Enable */
   TCNT0= 0;
-  TCCR0B= UA_TMR_PRESCALE_REG;
+  TCCR0B= UA_TMR_PRESCALE_REG; /* start timer */
 
   // This is a dirty fix to make sure the stop bit
   // is sent even if the sender is in a hurry and sends the
@@ -93,26 +104,72 @@ ISR(PCINT0_vect)
   if (!uart_status.flags.transmission) {
     // This is not a byte expected by an active
     // transmission. So start one
-
+    /* TODO fill buffer with this block machinecode*/
     uart_status.flags.transmission= 1;
     uart_status.flags.active_clock= 0;
     uart_status.flags.forward= 0;
-    uart_status.flags.header= 1;
+    uart_status.flags.rcving_header= 1;
+    uart_status.flags.snding_header= 0;
 
+    uart_status.packet_index = 0;
+    for(int i=0;i<6;i++) uart_status.packet_header_rcvd[i] = 0;
+    for(int i=0;i<6;i++) uart_status.packet_header_send[i] = 0;
     uart_status.passive_len= UA_HDR_LEN;
+
+  }
+  else if (uart_status.packet_index<=1) {}  /* Not enough data to do anything */
+  else if (uart_status.flags.transmission && uart_status.flags.snding_header) {
+
+    if (uart_status.packet_index==2) {
+      /* eval Mnemonic */
+      if (uart_status.packet_header_rcvd[0]==0x0 && uart_status.packet_header_rcvd[0]==[1]==0x1) { /* rcvd AQ */
+        uart_status.packet_header_send[0]=0x0 /* send AQ */
+        uart_status.packet_header_send[1]=0x1 /* send AQ */
+        uart_status.flags.snding_header= 1; 
+        uart_status.flags.forward= 1;
+      }
+      /* TODO Handle things except AQ #Leonard */
+    }
+    if(uart_status.packet_index==4){
+      /* eval packet length */
+      uart_status.passive_len
+      uart_status.active_len = (uint16_t)(uart_status.packet_header_rcvd[2] << 8) | (uint16_t)(uart_status.packet_header_rcvd[3]);
+      uint16_t total_len = passive_len + active_len; /* If AQ, CKSUM_len is already in active_len */
+      uart_status.packet_header_send[2] = (uint8_t) (total_len >> 8);
+      uart_status.packet_header_send[3] = (uint8_t) (total_len & 0xFF);
+    }
+    /* Check if header is rcvd */
+    if (uart_status.packet_index>=4) {
+      if (uart_status.packet_header_rcvd[0]==0x0 && uart_status.packet_header_rcvd[0]==[1]==0x1) {
+        /* rcvd AQ */
+        if (uart_status.packet_index==6) {
+          /* cksum rcvd */
+          uart_status.flags.rcving_header = 0;
+        }
+        if (uart_status.packet_index==8) {
+          /* cksum sent */
+          uart_status.flags.snding_header = 0;
+          /* Finally end this condition tree */
+        }
+      }
+      else {
+
+      }
+    }
   }
 
+  uart_status.packet_index++;
   uart_status.bitnum= 0;
 }
 
 ISR(TIMER0_COMPA_vect)
 {
-  static uint8_t b_send, b_rcvd= 0x00;
+  static uint8_t b_send, b_rcvd= 0x00; /* rcvd==received */
 
   if (uart_status.bitnum == 0) { // start bit
     b_rcvd= 0x00;
 
-    if (uart_status.flags.forward) {
+    if (uart_status.flags.forward && !uart_status.flags.snding_header) {
       // Load next buffer byte
       if (rdbuf_pop(&uart_status.buf, (char *) &b_send) < 0) {
         // The buffer ran empty
@@ -124,6 +181,12 @@ ISR(TIMER0_COMPA_vect)
         TX_PORT&= ~_BV(TX_NUM);
       }
     }
+    else if (uart_status.flags.snding_header && uart_status.flags.forward) {
+      /* Handle Mnemonic, Length, optional Checksum */
+      if(uart_status.packet_index > 2){
+        b_send = uart_status.snding_header[uart_status.packet_index-3];
+      } /* else { dont send because uart_status.flags.forward==0 } */
+    }
   }
   else if (uart_status.bitnum >= 9) { // stop bit
     if (uart_status.flags.forward) {
@@ -132,18 +195,26 @@ ISR(TIMER0_COMPA_vect)
     }
 
     if (RX_PIN & _BV(RX_NUM)) {
+      /* TODO What if the stopbit was passed due to #USBSerialConvertersSuck? */
       // verify that a correct stop bit was received
 
-      if (rdbuf_push(&uart_status.buf, b_rcvd) < 0) {
-        // The buffer is full. This should not happen
+      if (!uart_status.flags.rcving_header) {
+        /* This is the reason why two seperate headerflags are nessessary */
+        /* The header is not meant for the buffer */
+        if (rdbuf_push(&uart_status.buf, b_rcvd) < 0) {
+          // The buffer is full. This should not happen
 
-        uart_status.flags.transmission= 0;
+          uart_status.flags.transmission= 0;
 
-        return;
+          return;
+        }
+      }
+      else {
+        uart_status.packet_header_rcvd[packet_index-1] = b_rcvd;
       }
     }
 
-    // Disable ths interrupt
+    /* Disable Timer/Counter0 Output Compare Match A Interrupt */
     TIMSK&= ~_BV(OCIE0A);
   }
   else { // data bit
@@ -194,7 +265,7 @@ void uart_init(void)
   TX_PORT&= ~_BV(TX_NUM);
   TX_DDR|= _BV(TX_NUM);
 
-  // Enable pin change interrupt on RX pin
+  /* Pin Change Interrupt Enable */
   PCMSK|= _BV(RX_NUM);
   GIMSK|= _BV(PCIE);
 }
