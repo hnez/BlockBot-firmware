@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
-#include "../minunit.h"
+#include <minunit.h>
 
 int tests_run = 0;
 
@@ -75,7 +75,7 @@ int8_t rdbuf_pop (struct rdbuf_t *buf, char *val)
 #define __UNIT_TEST__
 #define main main_orig
 
-#include "brick.c"
+#include "../uart.c"
 
 #include <malloc.h>
 #include <strings.h>
