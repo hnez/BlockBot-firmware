@@ -24,7 +24,7 @@
 
 #define UART_BITTIME(bit) (((1+bit)*F_CPU)/(2*BAUD_RATE*UA_TMR_PRESCALE_NUM))
 
-// For 8MHz ATtiny clock and prescaler value of 64
+// For F_CPU ATtiny clock and prescaler value of UA_TMR_PRESCALE_NUM
 const uint8_t uart_times[] PROGMEM = {
   UART_BITTIME(0),  // Start bit
   UART_BITTIME(1), UART_BITTIME(2), UART_BITTIME(3), UART_BITTIME(4), // Data bits
