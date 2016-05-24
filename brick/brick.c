@@ -1,10 +1,12 @@
-#include <avr/io.h>
-#include <avr/interrupt.h>
-#include <avr/pgmspace.h>
-#include <util/delay.h>
-#include <stdbool.h>
-
-#include <rdbuf.h>
+#ifndef __UNIT_TEST__
+  // Do not load avr headers in unit test code
+  #include <avr/io.h>
+  #include <avr/interrupt.h>
+  #include <avr/pgmspace.h>
+  #include <util/delay.h>
+  #include <stdbool.h>
+  #include <rdbuf.h>
+#endif
 
 /* For ATtiny85 */
 #define TX_DDR  DDRB
@@ -14,10 +16,22 @@
 #define RX_DDR  DDRB
 #define RX_PIN  PINB
 #define RX_NUM  PB3
-#define RX_Interrupt PCINT3
 
-#define UA_TMR_PRESCALE (_BV(CS01) | _BV(CS00))
+#define UA_TMR_PRESCALE_REG (_BV(CS01) | _BV(CS00))
+#define UA_TMR_PRESCALE_NUM 64
 #define UA_HDR_LEN (4)
+
+#define BAUD_RATE 9600
+
+#define UART_BITTIME(bit) (((1+bit)*F_CPU)/(2*BAUD_RATE*UA_TMR_PRESCALE_NUM))
+
+// For 8MHz ATtiny clock and prescaler value of 64
+const uint8_t uart_times[] PROGMEM = {
+  UART_BITTIME(0),  // Start bit
+  UART_BITTIME(1), UART_BITTIME(2), UART_BITTIME(3), UART_BITTIME(4), // Data bits
+  UART_BITTIME(5), UART_BITTIME(6), UART_BITTIME(7), UART_BITTIME(8),
+  UART_BITTIME(9), // Stop bit
+};
 
 struct {
   struct rdbuf_t buf;
@@ -32,14 +46,6 @@ struct {
     uint8_t header : 1;
   } flags;
 } uart_status;
-
-
-// For 8MHz ATtiny clock and prescaler value of 64
-const uint8_t uart_times[] PROGMEM = {
-  6,  // Start bit
-  20, 32, 46, 60, 72, 84, 100, 110, // Data bits
-  124, // Stop bit
-};
 
 ISR(PCINT0_vect)
 {
@@ -59,7 +65,7 @@ ISR(PCINT0_vect)
   OCR0A= pgm_read_byte(&uart_times[0]);
   TIMSK|= _BV(OCIE0A);
   TCNT0= 0;
-  TCCR0B= UA_TMR_PRESCALE;
+  TCCR0B= UA_TMR_PRESCALE_REG;
 
   // This is a dirty fix to make sure the stop bit
   // is sent even if the sender is in a hurry and sends the
@@ -171,8 +177,8 @@ void uart_init(void)
   uart_status.flags.transmission= 0;
 
   // Set TX pin to driven high state
-  TX_PORT&= _BV(TX_NUM);
-  TX_DDR&= _BV(TX_NUM);
+  TX_PORT&= ~_BV(TX_NUM);
+  TX_DDR|= _BV(TX_NUM);
 
   // Enable pin change interrupt on RX pin
   PCMSK|= _BV(RX_NUM);
@@ -181,5 +187,5 @@ void uart_init(void)
 
 int main (void)
 {
-
+  return (0);
 }
