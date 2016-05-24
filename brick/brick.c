@@ -39,9 +39,24 @@ struct {
                            passively clocked mode for */
   uint8_t bitnum;
 
+  /*
+   * The structure below encodes the current
+   * state the software UART is in.
+   *  transmission  - is set when bytes are being transfered right now
+   *                  e.g. the previous block in the chain transmits a packet
+   *                  or the block is sending bytes without a previous block
+   *  active_clock  - is set when the previous block does not send
+   *                  packets but the block should nevertheless send bytes.
+   *                  The block is then itself responsible for timing the bytes.
+   *  forward       - is set, when for every received byte a byte should be
+   *                  transmitted.
+   *                  e.g. when forwarding a aquisition request
+   *  header        - is set, when the packet length is jet to be determined
+   *                  e.g. not enough bytes of the header where received yet.
+   */
   struct {
     uint8_t transmission : 1;
-    uint8_t passive_clock : 1;
+    uint8_t active_clock : 1;
     uint8_t forward : 1;
     uint8_t header : 1;
   } flags;
@@ -69,7 +84,7 @@ ISR(PCINT0_vect)
 
   // This is a dirty fix to make sure the stop bit
   // is sent even if the sender is in a hurry and sends the
-  // next start bit a bit early
+  // next start bit a bit early #USBSerialConvertersSuck
   TX_PORT|= _BV(TX_NUM);
 
   // Disable Pin change interrupts while the transmission
@@ -78,10 +93,10 @@ ISR(PCINT0_vect)
 
   if (!uart_status.flags.transmission) {
     // This is not a byte expected by an active
-    // transmission
+    // transmission. So start one
 
     uart_status.flags.transmission= 1;
-    uart_status.flags.passive_clock= 1;
+    uart_status.flags.active_clock= 0;
     uart_status.flags.forward= 0;
     uart_status.flags.header= 1;
 
