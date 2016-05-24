@@ -39,5 +39,8 @@ tests: $(TEST_TGT)
 	./$@
 	rm $@
 
+%.o: %.c
+	$(CC) $(CFLAGS) $(AVRCFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -o $@ -c $<
+
 %.elf : $(OBJECTS)
 	$(CC) $(AVRCFLAGS) $(CFLAGS) -o $@ $(OBJECTS) $(LIBS)
