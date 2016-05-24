@@ -125,7 +125,7 @@ ISR(PCINT0_vect)
       if (uart_status.packet_header_rcvd[0]==0x0 && uart_status.packet_header_rcvd[0]==[1]==0x1) { /* rcvd AQ */
         uart_status.packet_header_send[0]=0x0 /* send AQ */
         uart_status.packet_header_send[1]=0x1 /* send AQ */
-        uart_status.flags.snding_header= 1; 
+        uart_status.flags.snding_header= 1;
         uart_status.flags.forward= 1;
       }
       /* TODO Handle things except AQ #Leonard */
@@ -145,6 +145,13 @@ ISR(PCINT0_vect)
         if (uart_status.packet_index==6) {
           /* cksum rcvd */
           uart_status.flags.rcving_header = 0;
+          /* TODO Create new CKSUM
+          received CKSUM in
+          uart_status.packet_header_rcvd[4] and
+          uart_status.packet_header_rcvd[5]
+          */
+          uart_status.packet_header_send[4] = 0;
+          uart_status.packet_header_send[5] = 0;
         }
         if (uart_status.packet_index==8) {
           /* cksum sent */
@@ -153,7 +160,9 @@ ISR(PCINT0_vect)
         }
       }
       else {
-
+        /* Things except AQ dont have a CKSUM */
+        uart_status.flags.rcving_header = 0;
+        uart_status.flags.snding_header = 0;
       }
     }
   }
