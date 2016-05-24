@@ -1,7 +1,7 @@
 PROGNAME= brick
 CPU= attiny85
 FREQ= 8000000
-SOURCES= $(PROGNAME).c
+SOURCES= $(PROGNAME).c uart.c
 CFLAGS+= -I../rdbuf
 CFLAGS+= -L../rdbuf
 LIBS= -lrdbuf.$(CPU)-$(FREQ)
