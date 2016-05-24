@@ -22,7 +22,7 @@
 
 #define BAUD_RATE 9600
 
-#define UART_BITTIME(bit) (((1+bit)*F_CPU)/(2*BAUD_RATE*UA_TMR_PRESCALE_NUM))
+#define UART_BITTIME(bit) (((1+2*bit)*F_CPU)/(2*BAUD_RATE*UA_TMR_PRESCALE_NUM))
 
 // For F_CPU ATtiny clock and prescaler value of UA_TMR_PRESCALE_NUM
 const uint8_t uart_times[] PROGMEM = {
