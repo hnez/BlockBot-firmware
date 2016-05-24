@@ -5,57 +5,69 @@
 
 #include "memory.h"
 
+#define VM_NUM_REGS 3
+#define VM_NUM_STACKSLOTS 6
+
 #define VM_ERR 0
 #define VM_OK 1
 
 #define VM_JMP_BWD 0
 #define VM_JMP_FWD 1
 
-// TODO REMOVE ME !!
-void uart_puts(char *);
-
-inline void uart_puthb(uint8_t b)
-{
-  char hexnum[] = "0123456789abcdef";
-  char *string="  \r\n";
-  string[0]= hexnum[b>>4];
-  string[1]= hexnum[b&0x0f];
-
-  uart_puts(string);
-}
-
 
 struct vm_status_t {
-  uint8_t regs[3];
-  uint8_t mem[3];
+  uint8_t regs[VM_NUM_REGS];
+  uint8_t mem[MEM_RAMSLOTS];
 
   uint16_t pc;
+
+  struct {
+    uint8_t overflow : 1;
+  } flags;
+
+  struct {
+    struct {
+      uint16_t pc;
+      uint8_t rc;
+    } slots[VM_NUM_STACKSLOTS];
+    uint8_t len;
+    uint16_t shadow_pc;
+  } jstack;
 
   uint16_t prog_len;
   uint8_t *prog;
 };
 
-extern struct vm_status_t vm_status;
-
-inline uint8_t vm_verify_jmp (uint8_t dir, uint16_t len)
+/*
+ * Update the program counter with a relative jump address while
+ * checking for program counter overflows.
+ * Returns VM_OK if the jump fits into the program boundaries or
+ * VM_ERR otherwise.
+ * The offsets for FWD jumps (0) and BWD jumps (2) are due to the fact,
+ * that the program counter is updated to the next address before the
+ * current operation is executed, an that length 0 jumps do not make sense.
+ */
+inline int8_t vm_rel_jump (struct vm_status_t *vm, uint8_t dir, uint16_t len)
 {
   if (dir == VM_JMP_FWD) {
-    return ((vm_status.prog_len - vm_status.pc) > len ? VM_OK : VM_ERR);
+    return (__builtin_add_overflow(vm->pc, len , &vm->pc) ? VM_ERR : VM_OK);
   }
   else {
-    return (vm_status.pc >= len ? VM_OK : VM_ERR);
-  }    
+    return (__builtin_sub_overflow(vm->pc, len + 2, &vm->pc) ? VM_ERR : VM_OK);
+  }
 }
 
-inline uint8_t vm_do_jmp (uint8_t dir, uint16_t len)
+/*
+ * Get next instruction/program space byte into *op.
+ * And increment program counter _afterwards_.
+ * returns VM_OK in case of success. Or a VM_ERR for error.
+ */
+inline int8_t vm_next_op (struct vm_status_t *vm, uint8_t *op)
 {
-  if (vm_verify_jmp(dir, len) == VM_OK) {
-    if (dir == VM_JMP_BWD) {
-      vm_status.pc -= len;
-    }
-    else {
-      vm_status.pc += len;
-    }
+  if (vm->pc < vm->prog_len) {
+    *op= vm->prog[vm->pc];
+
+    vm->pc++;
 
     return (VM_OK);
   }
@@ -64,13 +76,5 @@ inline uint8_t vm_do_jmp (uint8_t dir, uint16_t len)
   }
 }
 
-inline uint8_t vm_next_op (void)
-{
-  // Should there be a check here ?
-  // How would it indicate an error ?
-  
-  return (vm_status.prog[vm_status.pc++]);
-}
-
-uint8_t vm_step (void);
-void vm_run (void);
+uint8_t vm_step (struct vm_status_t *vm);
+void vm_run (struct vm_status_t *vm);

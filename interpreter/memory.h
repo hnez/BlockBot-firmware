@@ -7,9 +7,10 @@
 #define MEM_ERR 0
 
 #define MEM_LEN 8
+#define MEM_RAMSLOTS 3
 
-typedef uint8_t (*mem_getcb_t) (uint8_t);
-typedef uint8_t (*mem_setcb_t) (uint8_t, uint8_t);
+typedef uint8_t (*mem_getcb_t) (struct vm_status_t *, uint8_t, uint8_t *);
+typedef uint8_t (*mem_setcb_t) (struct vm_status_t *, uint8_t, uint8_t);
 
 struct mem_slot {
   mem_getcb_t get;
@@ -18,7 +19,7 @@ struct mem_slot {
 
 extern const struct mem_slot mem_map[MEM_LEN];
 
-inline uint8_t mem_get(uint8_t addr)
+inline uint8_t mem_get(struct vm_status_t *vm, uint8_t addr, uint8_t *val)
 {
   if (addr < MEM_LEN) {
 
@@ -31,14 +32,14 @@ inline uint8_t mem_get(uint8_t addr)
       return (MEM_ERR);
     }
 
-    return (cb(addr));
+    return(cb(vm, addr, val));
   }
   else {
     return (MEM_ERR);
   }
 }
 
-inline uint8_t mem_set(uint8_t addr, uint8_t val)
+inline uint8_t mem_set(struct vm_status_t *vm, uint8_t addr, uint8_t val)
 {
   if (addr < MEM_LEN) {
     // "ISO C forbids conversion of object pointer to function pointer type"
@@ -49,8 +50,8 @@ inline uint8_t mem_set(uint8_t addr, uint8_t val)
     if (!cb) {
       return (MEM_ERR);
     }
-    
-    return (cb(addr, val));
+
+    return (cb(vm, addr, val));
   }
   else {
     return (MEM_ERR);
