@@ -6,3 +6,4 @@ ul_*
 __pycache__
 *.bc
 *.a
+*.test

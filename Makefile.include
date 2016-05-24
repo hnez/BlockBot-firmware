@@ -11,11 +11,16 @@ CFLAGS+= -ffunction-sections -fdata-sections \
 	-fno-caller-saves -Os -Wall -Wextra -pedantic -Werror -Wshadow -Wstrict-overflow \
 	-fno-strict-aliasing -std=c11 -static
 
+TEST_SRC+= $(wildcard tests/*.c)
+TEST_TGT= $(patsubst %.c, %.test, $(TEST_SRC))
+
 .PHONY: all
 all: $(ATGTS) $(PROGNAME).elf
 
 .PHONY: clean
 clean:
+	echo $(TEST_SRC)
+	echo $(TEST_TGT)
 	rm -f *.o *.elf
 
 .PHONY: flash
@@ -27,10 +32,12 @@ fuse:
 	$(FLASHPROG) $(FLASHFLAGS) $(FUSES)
 
 .PHONY: tests
-tests:
-	$(HOSTCC) $(CFLAGS) -o tests tests.c
-	./tests
-	rm tests
+tests: $(TEST_TGT)
+
+%.test: %.c
+	$(HOSTCC) $(CFLAGS) -I ../ -o $@ $<
+	./$@
+	rm $@
 
 %.elf : $(OBJECTS)
 	$(CC) $(AVRCFLAGS) $(CFLAGS) -o $@ $(OBJECTS) $(LIBS)
