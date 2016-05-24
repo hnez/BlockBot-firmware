@@ -92,7 +92,6 @@ ISR(PCINT0_vect)
   }
 
   // Reset and start the bit timer
-  // And enable the overflow interrupt
   OCR0A= pgm_read_byte(&uart_times[0]);
   TIMSK|= _BV(OCIE0A); /* Timer/Counter0 Output Compare Match A Interrupt Enable */
   TCNT0= 0;
@@ -110,7 +109,9 @@ ISR(PCINT0_vect)
   if (!uart_status.flags.transmission) {
     // This is not a byte expected by an active
     // transmission. So start one
+
     /* TODO fill buffer with this block machinecode*/
+
     uart_status.flags.transmission= 1;
     uart_status.flags.active_clock= 0;
     uart_status.flags.forward= 0;
@@ -189,6 +190,14 @@ ISR(PCINT0_vect)
       }
     }
   }
+  /* When active_clock is needed */
+  else if (uart_status.packet_index==uart_status.active_len + 3){
+    uart_status.flags.active_clock = 1;
+    /* This case needs to be handled for the first time
+       right after the stop bit of the last passive byte
+       because this is the last time this interrupt is called */
+  }
+
 
   uart_status.packet_index++;
   uart_status.bitnum= 0;
@@ -225,31 +234,54 @@ ISR(TIMER0_COMPA_vect)
       TX_PORT|= _BV(TX_NUM);
     }
 
-    if (RX_PIN & _BV(RX_NUM)) {
-      /* TODO handle case where no stop bit was received due to
-       * #USBSerialConvertersSuck
-       * Maybe don't even check for stop bit and push
-       * after the 8. data bit is received */
+    /* Dont verify that a correct stop bit was received
+     * #USBSerialConvertersSuck */
 
-      // verify that a correct stop bit was received
-      if (!uart_status.flags.rcving_header) {
-        /* This is the reason why two seperate headerflags are nessessary
-         * The header is not meant for the buffer */
-        if (rdbuf_push(&uart_status.buf, b_rcvd) < 0) {
-          // The buffer is full. This should not happen
+    if (!uart_status.flags.rcving_header) {
+      /* This is the reason why two seperate headerflags are nessessary
+       * The header is not meant for the buffer */
+      if (rdbuf_push(&uart_status.buf, b_rcvd) < 0) {
+        // The buffer is full. This should not happen
 
-          uart_status.flags.transmission= 0;
+        uart_status.flags.transmission= 0;
 
-          return;
-        }
-      }
-      else {
-        uart_status.packet_header_rcvd[uart_status.packet_index-1] = b_rcvd;
+        return;
       }
     }
+    else {
+      uart_status.packet_header_rcvd[uart_status.packet_index-1] = b_rcvd;
+    }
+
 
     /* Disable Timer/Counter0 Output Compare Match A Interrupt */
     TIMSK&= ~_BV(OCIE0A);
+
+    /* active_clock */
+    if(uart_status.flags.active_clock){
+
+      if (uart_status.packet_index<uart_status.total_len + 4){
+
+        /* Gap between bytes */
+        TCCR0B= 0;
+        _delay_us(65);
+
+        /* See Pin Change Interrupt for comments TODO May create a function? */
+        OCR0A= pgm_read_byte(&uart_times[0]);
+        TIMSK|= _BV(OCIE0A);
+        TCNT0= 0;
+        TCCR0B= UA_TMR_PRESCALE_REG;
+        uart_status.packet_index++;
+        uart_status.bitnum= 0;
+      }
+      /* When everything is transfered */
+      else {
+        GIMSK|= _BV(PCIE); /* Enable Pin Change interrupt */
+        TCCR0B= 0; /* Stop timer */
+        /* There is no need to set anything else because everything
+           is set in the next Pin Change Interrupt */
+      }
+    }
+
   }
   else { // data bit
     b_rcvd>>=1;
@@ -268,7 +300,7 @@ ISR(TIMER0_COMPA_vect)
       b_send>>=1;
     }
 
-    if (uart_status.bitnum == 8) {
+    if (uart_status.bitnum == 8 && !uart_status.flags.active_clock) {
       /*
        * #USBSerialConvertersSuck
        * The sender might decide to send the next
