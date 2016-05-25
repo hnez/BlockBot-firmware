@@ -1,5 +1,7 @@
-#include <avr/io.h>
-#include <avr/pgmspace.h>
+#ifndef __UNIT_TEST__
+  #include <avr/io.h>
+  #include <avr/pgmspace.h>
+#endif
 
 #include "opcodes.h"
 #include "memory.h"
@@ -282,4 +284,4 @@ PROGMEM const op_cb_t op_opmap[16]= {
   op_lda,
   op_sta,
   op_sta
-};
+}

@@ -4,16 +4,16 @@
   #include <avr/io.h>
   #include <avr/pgmspace.h>
 
-typedef void (fktptr_t)(void);
+  typedef void (fktptr_t)(void);
 
-//  typedef void (fktptr_t)(void);
-inline fktptr_t *pgm_read_fktptr(const void *orig)
-{
-  // "ISO C forbids conversion of object pointer to function pointer type"
-  //  op_cb_t cb= (op_cb_t)pgm_read_ptr(&op_opmap[op_dec_mayor(op)]);
-  // This workaround does not feel quite right:
-  return ((fktptr_t *)pgm_read_word(orig));
-}
+  //  typedef void (fktptr_t)(void);
+  inline fktptr_t *pgm_read_fktptr(const void *orig)
+  {
+    // "ISO C forbids conversion of object pointer to function pointer type"
+    //  op_cb_t cb= (op_cb_t)pgm_read_ptr(&op_opmap[op_dec_mayor(op)]);
+    // This workaround does not feel quite right:
+    return ((fktptr_t *)pgm_read_word(orig));
+  }
 #endif
 
 #define VM_NUM_REGS 3
