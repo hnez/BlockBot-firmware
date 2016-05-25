@@ -193,11 +193,10 @@ ISR(PCINT0_vect)
   /* When active_clock is needed */
   else if (uart_status.packet_index==uart_status.active_len + 3){
     uart_status.flags.active_clock = 1;
-    /* This case needs to be handled for the first time
+    /* This case needs to be handled
        right after the stop bit of the last passive byte
        because this is the last time this interrupt is called */
   }
-
 
   uart_status.packet_index++;
   uart_status.bitnum= 0;
@@ -261,17 +260,8 @@ ISR(TIMER0_COMPA_vect)
 
       if (uart_status.packet_index<uart_status.total_len + 4){
 
-        /* Gap between bytes */
-        TCCR0B= 0;
-        _delay_us(65);
-
-        /* See Pin Change Interrupt for comments */
-        OCR0A= pgm_read_byte(&uart_times[0]);
-        TIMSK|= _BV(OCIE0A);
-        TCNT0= 0;
-        TCCR0B= UA_TMR_PRESCALE_REG;
-        uart_status.packet_index++;
-        uart_status.bitnum= 0;
+        /* Timer/Counter0 Overflow Interrupt Enable */
+        TIMSK|= _BV(TOIE0);
       }
       /* When everything is transfered */
       else {
@@ -281,7 +271,6 @@ ISR(TIMER0_COMPA_vect)
            is set in the next Pin Change Interrupt */
       }
     }
-
   }
   else { // data bit
     b_rcvd>>=1;
@@ -321,6 +310,22 @@ ISR(TIMER0_COMPA_vect)
   // Shedule next bit
   uart_status.bitnum++;
   OCR0A= pgm_read_byte(&uart_times[uart_status.bitnum]);
+}
+
+ISR(TIMER0_OVF_vect) /* Gap between bytes when active clock is enabled */
+{
+  /* See Pin Change Interrupt for some more comments */
+  OCR0A= pgm_read_byte(&uart_times[0]);
+
+  TIMSK|= _BV(OCIE0A) /* Enable compare interrupt */
+  /* TCNT0= 0; is not nessessary because after
+   * Overflow TCNT0 gets set back to 0
+   * and timer0 is still counting */
+  uart_status.packet_index++;
+  uart_status.bitnum= 0;
+
+  /* Timer/Counter0 Overflow Interrupt Disable */
+  TIMSK&= ~_BV(TOIE0);
 }
 
 void uart_init(void)
