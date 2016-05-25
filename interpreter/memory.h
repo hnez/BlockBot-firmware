@@ -1,13 +1,16 @@
-#include <avr/io.h>
-#include <avr/pgmspace.h>
-
 #pragma once
+
+#ifndef __UNIT_TEST__
+  #include <avr/io.h>
+  #include <avr/pgmspace.h>
+#endif
+
+#include "vm.h"
 
 #define MEM_OK 1
 #define MEM_ERR 0
 
 #define MEM_LEN 8
-#define MEM_RAMSLOTS 3
 
 typedef uint8_t (*mem_getcb_t) (struct vm_status_t *, uint8_t, uint8_t *);
 typedef uint8_t (*mem_setcb_t) (struct vm_status_t *, uint8_t, uint8_t);

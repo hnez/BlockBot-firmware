@@ -15,6 +15,8 @@
 
 static uint8_t op_short (struct vm_status_t *vm, uint8_t op)
 {
+  uint8_t val;
+
   switch (op & 0x0f) {
   case 0x04:
     // SOV
@@ -67,15 +69,13 @@ static uint8_t op_short (struct vm_status_t *vm, uint8_t op)
   case 0x0a:
   case 0x0b:
     // LD
-    uint8_t val;
-
     // Check if next prog byte is still in the program
     if (vm_next_op(vm, &val) == VM_OK) {
       // Get the next program byte
       // Decode register number
       // Store register value and pass through the error status
 
-      return (reg_set(vm, op_dec_reg(op), 0, val);
+      return (reg_set(vm, op_dec_reg(op), 0, val));
     }
     else {
       // End of program ?
@@ -96,27 +96,37 @@ static uint8_t op_unary (struct vm_status_t *vm, uint8_t op)
   register uint8_t regnum= op_dec_reg(op);
   register uint8_t value= reg_get(vm, regnum);
 
-  switch (op & 0x0c) {
-  case (0x00): // DEC
-    vm->flags.overflow=
-      __builtin_sub_overflow(value, 1, &value)) ? 1 : 0;
+  switch (op >> 6) {
+  case (1): // DEC
+    /* #oldgccsucks
+     * vm->flags.overflow=
+     *  __builtin_sub_overflow(value, 1, &value)) ? 1 : 0; */
+
+    vm->flags.overflow= (value == 0x00) ? 1 : 0;
+    value--;
 
     return(reg_set(vm, regnum, 0 , value));
 
-  case (0x04): // INC
-    vm->flags.overflow=
-      __builtin_add_overflow(value, 1, &value)) ? 1 : 0;
+  case (2): // INC
+    /* #oldgccsucks
+     * vm->flags.overflow=
+     *   __builtin_add_overflow(value, 1, &value)) ? 1 : 0; */
+
+    vm->flags.overflow= (value == 0xff) ? 1 : 0;
+    value++;
 
     return(reg_set(vm, regnum, 0 , value));
 
-  case (0x08): // NOT
+  case (3): // NOT
     return(reg_set(vm, regnum, 0 , ~value));
 
-  case (0x0c): // SRR
+  case (4): // SRR
     vm->flags.overflow= (value & 1) ? 1 : 0;
 
     return(reg_set(vm, regnum, 0 , value>>1));
   }
+
+  __builtin_unreachable();
 }
 
 static uint8_t op_jfw (struct vm_status_t *vm, uint8_t op)
@@ -131,7 +141,7 @@ static uint8_t op_jbw (struct vm_status_t *vm, uint8_t op)
 
 static uint8_t op_lda (struct vm_status_t *vm, uint8_t op)
 {
-  register uint8_t val;
+  uint8_t val;
 
   if (mem_get(vm, op_dec_mema(op), &val) != MEM_OK) {
     return (OP_ERR);
@@ -194,10 +204,14 @@ static uint8_t op_add (struct vm_status_t *vm, uint8_t op)
 {
   uint8_t rega= reg_get(vm, op_dec_rega(op));
   uint8_t regb= reg_get(vm, op_dec_regb(op));
-  uint8_t val;
+  uint16_t val;
 
-  vm->flags.overflow=
-    __builtin_add_overflow(rega, regb, &val)) ? 1 : 0;
+  /* oldgccsucks
+   * vm->flags.overflow=
+   *   __builtin_add_overflow(rega, regb, &val)) ? 1 : 0; */
+
+  val= (uint16_t)rega + (uint16_t)regb;
+  vm->flags.overflow= (val > 0xff) ? 1 : 0;
 
   return (reg_set(vm,
                   op_dec_rega(op),
@@ -209,10 +223,14 @@ static uint8_t op_sub (struct vm_status_t *vm, uint8_t op)
 {
   uint8_t rega= reg_get(vm, op_dec_rega(op));
   uint8_t regb= reg_get(vm, op_dec_regb(op));
-  uint8_t val;
+  int16_t val;
 
-  vm->flags.overflow=
-    __builtin_sub_overflow(rega, regb, &val)) ? 1 : 0;
+  /* #olgccsucks
+   * vm->flags.overflow=
+   *   __builtin_sub_overflow(rega, regb, &val)) ? 1 : 0; */
+
+  val= (uint16_t)rega - (uint16_t)regb;
+  vm->flags.overflow= (val < 0) ? 1 : 0;
 
   return (reg_set(vm,
                   op_dec_rega(op),

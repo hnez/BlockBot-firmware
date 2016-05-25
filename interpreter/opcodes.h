@@ -1,6 +1,10 @@
 #pragma once
 
-#include <avr/io.h>
+#ifndef __UNIT_TEST__
+  #include <avr/io.h>
+#endif
+
+#include "vm.h"
 
 #define OP_OK 1
 #define OP_ERR 0

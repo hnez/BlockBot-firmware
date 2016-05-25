@@ -1,19 +1,24 @@
 #pragma once
 
-#include <avr/io.h>
-#include <avr/pgmspace.h>
+#ifndef __UNIT_TEST__
+  #include <avr/io.h>
+  #include <avr/pgmspace.h>
 
-#include "memory.h"
+typedef void (fktptr_t)(void);
+
+//  typedef void (fktptr_t)(void);
+inline fktptr_t *pgm_read_fktptr(const void *orig)
+{
+  // "ISO C forbids conversion of object pointer to function pointer type"
+  //  op_cb_t cb= (op_cb_t)pgm_read_ptr(&op_opmap[op_dec_mayor(op)]);
+  // This workaround does not feel quite right:
+  return ((fktptr_t *)pgm_read_word(orig));
+}
+#endif
 
 #define VM_NUM_REGS 3
 #define VM_NUM_STACKSLOTS 6
-
-#define VM_ERR 0
-#define VM_OK 1
-
-#define VM_JMP_BWD 0
-#define VM_JMP_FWD 1
-
+#define MEM_RAMSLOTS 3
 
 struct vm_status_t {
   uint8_t regs[VM_NUM_REGS];
@@ -38,6 +43,15 @@ struct vm_status_t {
   uint8_t *prog;
 };
 
+
+#include "memory.h"
+
+#define VM_ERR 0
+#define VM_OK 1
+
+#define VM_JMP_BWD 0
+#define VM_JMP_FWD 1
+
 /*
  * Update the program counter with a relative jump address while
  * checking for program counter overflows.
@@ -49,11 +63,32 @@ struct vm_status_t {
  */
 inline int8_t vm_rel_jump (struct vm_status_t *vm, uint8_t dir, uint16_t len)
 {
+  int32_t jpos;
+
   if (dir == VM_JMP_FWD) {
-    return (__builtin_add_overflow(vm->pc, len , &vm->pc) ? VM_ERR : VM_OK);
+    /* __builtin_add_overflow is only available in gcc > 5
+     * avr-gcc is at the time of writing onyl available in
+     * version 4.x #oldgccsucks
+     *  return (__builtin_add_overflow(vm->pc, len , &vm->pc) ? VM_ERR : VM_OK); */
+
+    jpos= (uint32_t)vm->pc + (uint32_t)len;
+
+    if (jpos > 0xffff) return (VM_ERR);
+
+    vm->pc= jpos;
+
+    return (VM_OK);
   }
   else {
-    return (__builtin_sub_overflow(vm->pc, len + 2, &vm->pc) ? VM_ERR : VM_OK);
+    // #oldgccsucks
+
+    jpos= (uint32_t)vm->pc - (uint32_t)len - 2;
+
+    if (jpos < 0) return (VM_ERR);
+
+    vm->pc= jpos;
+
+    return (VM_OK);
   }
 }
 
