@@ -12,7 +12,6 @@ uint8_t vm_step (struct vm_status_t *vm)
   uint8_t op;
 
   if (vm_next_op(vm, &op) == VM_OK) {
-
     op_cb_t cb= (op_cb_t)pgm_read_fktptr(&op_opmap[op_dec_mayor(op)]);
 
     return (cb(vm, op));
