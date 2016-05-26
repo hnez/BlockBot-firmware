@@ -10,6 +10,9 @@
   #include <rdbuf.h>
 #endif
 
+#define BAUD_RATE 9600
+#define UART_BITTIME(bit) (((1+2*bit)*F_CPU)/(2L*BAUD_RATE*UA_TMR_PRESCALE_NUM))
+
 /* For ATtiny85 */
 #define TX_DDR  DDRB
 #define TX_PORT PORTB
@@ -21,11 +24,10 @@
 
 #define UA_TMR_PRESCALE_REG (_BV(CS01) | _BV(CS00))
 #define UA_TMR_PRESCALE_NUM 64
-#define UA_HDR_LEN (6)
+#define UA_HDR_LEN (4) // Type, length
+#define UA_AQHDR_LEN (UA_HDR_LEN+2) // + Checksum
+#define UA_BYTE_GAP_TIME UART_BITTIME(4) // About half a byte of delay
 
-#define BAUD_RATE 9600
-
-#define UART_BITTIME(bit) (((1+2*bit)*F_CPU)/(2L*BAUD_RATE*UA_TMR_PRESCALE_NUM))
 
 // For F_CPU ATtiny clock and prescaler value of UA_TMR_PRESCALE_NUM
 const uint8_t uart_times[] PROGMEM = {
@@ -47,9 +49,9 @@ struct {
   uint8_t bitnum;
   uint16_t packet_index; /* The current position in a
                             packet transmission */
-  char packet_header_rcvd[UA_HDR_LEN]; /* The received header
+  char packet_header_rcvd[UA_AQHDR_LEN]; /* The received header
                                           of the previous block */
-  char packet_header_send[UA_HDR_LEN]; /* The header for the next
+  char packet_header_send[UA_AQHDR_LEN]; /* The header for the next
                                           block */
   /*
    * The structure below encodes the current
@@ -119,9 +121,9 @@ ISR(PCINT0_vect)
     uart_status.flags.snding_header= 0;
 
     uart_status.packet_index = 0;
-    bzero(uart_status.packet_header_rcvd, UA_HDR_LEN);
-    bzero(uart_status.packet_header_send, UA_HDR_LEN);
-    uart_status.passive_len= UA_HDR_LEN;
+    bzero(uart_status.packet_header_rcvd, UA_AQHDR_LEN);
+    bzero(uart_status.packet_header_send, UA_AQHDR_LEN);
+    uart_status.passive_len= UA_AQHDR_LEN;
   }
   else if (uart_status.packet_index<=1) {}  /* Not enough data to do anything */
   else if (uart_status.flags.transmission && uart_status.flags.snding_header) {
@@ -251,17 +253,18 @@ ISR(TIMER0_COMPA_vect)
       uart_status.packet_header_rcvd[uart_status.packet_index-1] = b_rcvd;
     }
 
-
-    /* Disable Timer/Counter0 Output Compare Match A Interrupt */
-    TIMSK&= ~_BV(OCIE0A);
-
     /* active_clock */
     if(uart_status.flags.active_clock){
+      if (uart_status.packet_index<uart_status.total_len + UA_HDR_LEN){
+        // Prepare interrupt for next cycle, compare match int is still enabled
+        OCR0A= pgm_read_byte(&uart_times[0]);
 
-      if (uart_status.packet_index<uart_status.total_len + 4){
+        /* The counter will count up to 255, then wrap around
+         * to zero, reach uart_times[0] and start a new cycle */
+        TCNT0= 255 - UA_BYTE_GAP_TIME;
 
-        /* Timer/Counter0 Overflow Interrupt Enable */
-        TIMSK|= _BV(TOIE0);
+        uart_status.packet_index++;
+        uart_status.bitnum= 0;
       }
       /* When everything is transfered */
       else {
@@ -270,6 +273,10 @@ ISR(TIMER0_COMPA_vect)
         /* There is no need to set anything else because everything
            is set in the next Pin Change Interrupt */
       }
+    }
+    else {
+      /* Disable Timer/Counter0 Output Compare Match A Interrupt */
+      TIMSK&= ~_BV(OCIE0A);
     }
   }
   else { // data bit
@@ -310,22 +317,6 @@ ISR(TIMER0_COMPA_vect)
   // Shedule next bit
   uart_status.bitnum++;
   OCR0A= pgm_read_byte(&uart_times[uart_status.bitnum]);
-}
-
-ISR(TIMER0_OVF_vect) /* Gap between bytes when active clock is enabled */
-{
-  /* See Pin Change Interrupt for some more comments */
-  OCR0A= pgm_read_byte(&uart_times[0]);
-
-  TIMSK|= _BV(OCIE0A) /* Enable compare interrupt */
-  /* TCNT0= 0; is not nessessary because after
-   * Overflow TCNT0 gets set back to 0
-   * and timer0 is still counting */
-  uart_status.packet_index++;
-  uart_status.bitnum= 0;
-
-  /* Timer/Counter0 Overflow Interrupt Disable */
-  TIMSK&= ~_BV(TOIE0);
 }
 
 void uart_init(void)
