@@ -28,15 +28,34 @@ inline fktptr_t *pgm_read_fktptr(const void *orig)
 #include <strings.h>
 #include <minunit.h>
 
+struct {
+  uint8_t values[8];
+  uint8_t should_fail;
+} mem_shim;
+
+uint8_t mem_getcb_fa(__attribute__((unused)) struct vm_status_t *vm, uint8_t addr, uint8_t *val)
+{
+  *val= mem_shim.values[addr];
+
+  return (mem_shim.should_fail ? MEM_ERR : MEM_OK);
+}
+
+uint8_t mem_setcb_fa(__attribute__((unused)) struct vm_status_t *vm, uint8_t addr, uint8_t val)
+{
+  mem_shim.values[addr]= val;
+
+  return (mem_shim.should_fail ? MEM_ERR : MEM_OK);
+}
+
 const struct mem_slot mem_map[MEM_LEN]= {
-  { NULL, NULL},
-  { NULL, NULL},
-  { NULL, NULL},
-  { NULL, NULL},
-  { NULL, NULL},
-  { NULL, NULL},
-  { NULL, NULL},
-  { NULL, NULL},
+  { mem_getcb_fa, mem_setcb_fa},
+  { mem_getcb_fa, mem_setcb_fa},
+  { mem_getcb_fa, mem_setcb_fa},
+  { mem_getcb_fa, mem_setcb_fa},
+  { mem_getcb_fa, mem_setcb_fa},
+  { mem_getcb_fa, mem_setcb_fa},
+  { mem_getcb_fa, mem_setcb_fa},
+  { mem_getcb_fa, mem_setcb_fa}
 };
 
 static char *test_emptyprog()
@@ -175,6 +194,56 @@ static char *test_op_jbw()
   return 0;
 }
 
+static char *test_op_sta()
+{
+  struct vm_status_t vm;
+  uint8_t prog[]={0x09, 0, 0xe1};
+  // LD RA, 0, STA 000 RA
+
+  for (int i=0;i<8;i++) {
+    bzero(&vm, sizeof(vm));
+    vm.prog= prog;
+    vm.prog_len= sizeof(prog);
+
+    prog[1]= i+1;
+    prog[2]= (prog[2] & 0xe3) | i<<2;
+
+    vm_run(&vm);
+
+    mu_assert("Writing a mem addr did not yield correct result",
+              mem_shim.values[i] == i+1);
+  }
+
+  vm_run(&vm);
+
+  return 0;
+}
+
+static char *test_op_lda()
+{
+  struct vm_status_t vm;
+  uint8_t prog[]={0xc1};
+  // LDA 000 RA
+
+  for (int i=0;i<8;i++) {
+    bzero(&vm, sizeof(vm));
+    vm.prog= prog;
+    vm.prog_len= sizeof(prog);
+
+    mem_shim.values[i] = i+1;
+    prog[0]= (prog[0] & 0xe3) | i<<2;
+
+    vm_run(&vm);
+
+    mu_assert("Reading a mem addr did not yield correct result",
+              vm.regs[0] == i+1);
+  }
+
+  vm_run(&vm);
+
+  return 0;
+}
+
 static char *all_tests() {
   mu_run_test(test_emptyprog);
   mu_run_test(test_op_sov);
@@ -182,6 +251,9 @@ static char *all_tests() {
   mu_run_test(test_op_ld);
   mu_run_test(test_op_jfw);
   mu_run_test(test_op_jbw);
+
+  mu_run_test(test_op_sta);
+  mu_run_test(test_op_lda);
 
   return 0;
 }
