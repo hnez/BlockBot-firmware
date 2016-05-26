@@ -244,6 +244,63 @@ static char *test_op_lda()
   return 0;
 }
 
+static char *test_op_add()
+{
+  struct vm_status_t vm;
+  uint8_t prog[]={0x86};
+  // ADD RA RB
+
+  for (int ra=0; ra<256; ra++) {
+    for (int rb=0; rb<256; rb++) {
+      bzero(&vm, sizeof(vm));
+      vm.prog= prog;
+      vm.prog_len= sizeof(prog);
+
+      vm.regs[0]=ra;
+      vm.regs[1]=rb;
+
+      vm_run(&vm);
+
+      mu_assert("Addition did not yield a correct result",
+                vm.regs[0] == (uint8_t)(ra + rb));
+
+      mu_assert("Addition did not set overflow flag correctly",
+                vm.flags.overflow == ((uint8_t)(ra + rb)!=(ra + rb)));
+    }
+  }
+
+  return 0;
+}
+
+
+static char *test_op_sub()
+{
+  struct vm_status_t vm;
+  uint8_t prog[]={0x96};
+  // SUB RA RB
+
+  for (int ra=0; ra<256; ra++) {
+    for (int rb=0; rb<256; rb++) {
+      bzero(&vm, sizeof(vm));
+      vm.prog= prog;
+      vm.prog_len= sizeof(prog);
+
+      vm.regs[0]=ra;
+      vm.regs[1]=rb;
+
+      vm_run(&vm);
+
+      mu_assert("Substraction did not yield a correct result",
+                vm.regs[0] == (uint8_t)(ra - rb));
+
+      mu_assert("Substraction did not set overflow flag correctly",
+                vm.flags.overflow == ((ra-rb)<0));
+    }
+  }
+
+  return 0;
+}
+
 static char *all_tests() {
   mu_run_test(test_emptyprog);
   mu_run_test(test_op_sov);
@@ -254,6 +311,9 @@ static char *all_tests() {
 
   mu_run_test(test_op_sta);
   mu_run_test(test_op_lda);
+
+  mu_run_test(test_op_add);
+  mu_run_test(test_op_sub);
 
   return 0;
 }
