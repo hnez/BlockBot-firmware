@@ -29,6 +29,9 @@
 #define UA_BYTE_GAP_TIME UART_BITTIME(4) // About half a byte of delay
 
 
+#define PING_TMR_PRESCALE_REG (_BV(CS02) | _BV(CS00))
+#define PING_TMR_PRESCALE_NUM 1024
+
 // For F_CPU ATtiny clock and prescaler value of UA_TMR_PRESCALE_NUM
 const uint8_t uart_times[] PROGMEM = {
   UART_BITTIME(0),  // Start bit
@@ -317,6 +320,11 @@ ISR(TIMER0_COMPA_vect)
   // Shedule next bit
   uart_status.bitnum++;
   OCR0A= pgm_read_byte(&uart_times[uart_status.bitnum]);
+}
+
+ISR(TIMER1_COMPA_vect)
+{
+  
 }
 
 void uart_init(void)
