@@ -29,7 +29,7 @@
 #define UA_BYTE_GAP_TIME UART_BITTIME(4) // About half a byte of delay
 
 
-#define PING_TMR_PRESCALE_REG (_BV(CS02) | _BV(CS00))
+#define PING_TMR_PRESCALE_REG (_BV(CS02) | _BV(CS00)) // Not in use yet
 #define PING_TMR_PRESCALE_NUM 1024
 
 // For F_CPU ATtiny clock and prescaler value of UA_TMR_PRESCALE_NUM
@@ -45,10 +45,8 @@ struct {
   uint16_t passive_len; /* Number of bytes to stay in
                            passively clocked mode for */
   uint16_t active_len;  /* Number of bytes to stay in
-                          actively clocked mode for
-                          TODO may remove later because
-                          there is no need to keep it*/
-  uint16_t total_len;  /* guess it */
+                          actively clocked mode for */
+  uint16_t total_len;   /* guess it */
   uint8_t bitnum;
   uint16_t packet_index; /* The current position in a
                             packet transmission */
@@ -115,7 +113,7 @@ ISR(PCINT0_vect)
     // This is not a byte expected by an active
     // transmission. So start one
 
-    /* TODO fill buffer with this block machinecode*/
+
 
     uart_status.flags.transmission= 1;
     uart_status.flags.active_clock= 0;
@@ -126,7 +124,7 @@ ISR(PCINT0_vect)
     uart_status.packet_index = 0;
     bzero(uart_status.packet_header_rcvd, UA_AQHDR_LEN);
     bzero(uart_status.packet_header_send, UA_AQHDR_LEN);
-    uart_status.passive_len= UA_AQHDR_LEN;
+    uart_status.passive_len= UA_HDR_LEN;
   }
   else if (uart_status.packet_index<=1) {}  /* Not enough data to do anything */
   else if (uart_status.flags.transmission && uart_status.flags.snding_header) {
@@ -150,7 +148,10 @@ ISR(PCINT0_vect)
         | (uint16_t)(uart_status.packet_header_rcvd[3]);
 
       uart_status.total_len = uart_status.passive_len +
-        uart_status.active_len;
+                              rdbuf_len(&uart_status.buf) +
+      /* The reservation should be counted aswell, since it
+      shifts the wrpos */
+                              uart_status.active_len;
       /* If AQ, CKSUM_len is already in active_len */
 
       uart_status.packet_header_send[2] = (uint8_t) (uart_status.total_len >> 8);
@@ -324,7 +325,7 @@ ISR(TIMER0_COMPA_vect)
 
 ISR(TIMER1_COMPA_vect)
 {
-  
+
 }
 
 void uart_init(void)
