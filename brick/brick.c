@@ -9,7 +9,7 @@
 #endif
 
   // TODO Change this
-  char block_cmds[10] = {"0123456789"}
+  char descriptor[10] = {"0123456789"}
   /* I used this a few times in the project. We ne to replace that aswell */
 
 int main (void)
@@ -28,11 +28,11 @@ int main (void)
       if(rdbuf_len(&uart_status.buf)>0){
 
         /* reserve space */
-        rdbuf_reserve(&uart_status.buf, sizeof(block_cmds));
-        
+        rdbuf_reserve(&uart_status.buf, sizeof(descriptor));
+
         /* process reservation */
-        for(int c=0;c<sizeof(block_cmds);c++){
-          if(rdbuf_reserve_push(&uart_status.buf, block_cmds[c]) < 0){
+        for(int c=0;c<sizeof(descriptor);c++){
+          if(rdbuf_reserve_push(&uart_status.buf, descriptor[c]) < 0){
             /* full, this shouldnt happen since the space got reserved */
           }
         }
