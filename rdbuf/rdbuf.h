@@ -13,9 +13,9 @@ struct rdbuf_t {
 
   struct {
     uint8_t resvpos; /*current write position */
-    uint8_t f_resvbyte; /* First reservated byte */
-    uint8_t l_resvbyte; /* Last reservated byte */
-    uint8_t resv_len;
+    uint8_t f_byte; /* First reservated byte */
+    uint8_t l_byte; /* Last reservated byte */
+    uint8_t len;
 
     struct {
       uint8_t resv : 1; /* reservation flag */
@@ -34,4 +34,5 @@ uint8_t rdbuf_len(struct rdbuf_t *);
 int8_t rdbuf_push (struct rdbuf_t *, char);
 int8_t rdbuf_pop (struct rdbuf_t *, char *);
 int8_t rdbuf_reserve (struct rdbuf_t *buf, uint8_t count);
-int8_t rdbuf_reserve_push (struct rdbuf_t *buf, char val);
+int8_t rdbuf_finish_resv (struct rdbuf_t *buf);
+int8_t rdbuf_put_resv (struct rdbuf_t *buf, uint8_t pos, char val);
