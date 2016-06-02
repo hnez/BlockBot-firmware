@@ -1,7 +1,7 @@
 PROGNAME= robot
 CPU= atmega8
 FREQ= 12000000
-SOURCES= $(PROGNAME).c motor.c suart.c timer.c buttons.c leds.c
+SOURCES= $(PROGNAME).c motor.c timer.c buttons.c leds.c
 CFLAGS+= -I../interpreter -I ../saxparse
 CFLAGS+= -L../interpreter -L ../saxparse
 LIBS= -lbrkvm.$(CPU)-$(FREQ) -lmsgsax.$(CPU)-$(FREQ)
@@ -9,7 +9,7 @@ ATGTS+= libbrkvm.$(CPU)-$(FREQ).a libmsgsax.$(CPU)-$(FREQ).a
 
 FUSES= -U efuse:w:0xFF:m -U hfuse:w:0xDF:m -U lfuse:w:0xe2:m
 
-FLASHDEV?= -c stk500v1 -b 19200 -P /dev/ttyUSB0
+FLASHDEV?= -c usbasp
 
 include ../Makefile.include
 

@@ -1,4 +1,7 @@
 #pragma once
 
-uint8_t mem_gettimer (__attribute__((unused)) uint8_t);
-uint8_t mem_settimer (uint8_t, uint8_t);
+#include <vm.h>
+
+void timer_init(void);
+uint8_t mem_gettimer (struct vm_status_t *, uint8_t, uint8_t *);
+uint8_t mem_settimer (struct vm_status_t *, uint8_t, uint8_t);
