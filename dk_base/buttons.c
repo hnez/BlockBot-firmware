@@ -2,7 +2,9 @@
 
 #include "buttons.h"
 
-uint8_t mem_getdin (__attribute__((unused)) uint8_t addr)
+uint8_t mem_getbtn (__attribute__((unused)) struct vm_status_t *vm,
+                    __attribute__((unused)) uint8_t addr,
+                    uint8_t *val)
 {
   register uint8_t btn=0;
 
@@ -14,5 +16,7 @@ uint8_t mem_getdin (__attribute__((unused)) uint8_t addr)
     btn|= _BV(2);
   }
 
-  return (btn);
+  *val= btn;
+
+  return (MEM_OK);
 }

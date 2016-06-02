@@ -1,7 +1,7 @@
 PROGNAME= robot
 CPU= atmega8
 FREQ= 12000000
-SOURCES= $(PROGNAME).c motor.c timer.c buttons.c leds.c
+SOURCES= $(PROGNAME).c motor.c timer.c buttons.c leds.c vm_ram.c
 CFLAGS+= -I../interpreter -I ../saxparse
 CFLAGS+= -L../interpreter -L ../saxparse
 LIBS= -lbrkvm.$(CPU)-$(FREQ) -lmsgsax.$(CPU)-$(FREQ)

@@ -1,35 +1,25 @@
 #include <avr/io.h>
 
-#include "vm.h"
+#include <vm.h>
 
-#define LED_DDR  DDRA
-#define LED_PORT PORTA
-#define LED_NUM  PA6
+#include "leds.h"
 
-uint8_t mem_getled (__attribute__((unused)) uint8_t addr)
+
+uint8_t mem_getled (__attribute__((unused)) struct vm_status_t *vm,
+                    __attribute__((unused)) uint8_t addr,
+                    uint8_t *val)
 {
-  register uint8_t leds=0;
-
-  if (LED_PORT & 0x01) {
-    leds|= _BV(0);
-  }
-
-  return (leds);
-}
-
-uint8_t mem_setled (__attribute__((unused)) uint8_t addr, uint8_t val)
-{
-  if (val & 0x01) {
-    LED_PORT |=  _BV(LED_NUM);
-  }
-  else {
-    LED_PORT &= ~_BV(LED_NUM);
-  }
+  *val|= (LED_PORT & 0x01) ? _BV(0) : 0;
 
   return (MEM_OK);
 }
 
-void leds_init(void)
+uint8_t mem_setled (__attribute__((unused)) struct vm_status_t *vm,
+                    __attribute__((unused)) uint8_t addr,
+                    uint8_t val)
 {
-  LED_DDR |= _BV(LED_NUM);
+  LED_PORT= (LED_PORT & ~_BV(LED_NUM))
+    | ((val & 0x01) ? _BV(LED_NUM) : 0);
+
+  return (MEM_OK);
 }

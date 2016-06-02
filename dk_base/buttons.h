@@ -1,5 +1,11 @@
 #pragma once
 
+#include <vm.h>
+
+#ifndef NULL
+#define NULL ((void*)0)
+#endif
+
 #define BUTTON_PWR_PORT PORTA
 #define BUTTON_PWR_PIN  PINA
 #define BUTTON_PWR_NUM  PA2
@@ -18,6 +24,7 @@ inline uint8_t button_pwr_pressed(void)
   return !(BUTTON_PWR_PIN & _BV(BUTTON_PWR_NUM));
 }
 
+uint8_t mem_getbtn (struct vm_status_t *, uint8_t, uint8_t *);
 
 inline void buttons_init(void)
 {

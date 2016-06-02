@@ -9,16 +9,17 @@
 #include "buttons.h"
 #include "timer.h"
 #include "leds.h"
+#include "vm_ram.h"
 
 PROGMEM const struct mem_slot mem_map[8]= {
   {mem_getmot,   mem_setmot},
   {mem_getmot,   mem_setmot},
-  {NULL, NULL},
-  {NULL, NULL},
+  {mem_getbtn,   NULL},
+  {mem_getled,   mem_setled},
   {mem_gettimer, mem_settimer},
-  {NULL, NULL},
-  {NULL, NULL},
-  {NULL, NULL}
+  {mem_getram,   mem_setram},
+  {mem_getram,   mem_setram},
+  {mem_getram,   mem_setram},
 };
 
 int main (void)

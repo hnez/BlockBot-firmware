@@ -19,11 +19,9 @@
 
 #define VM_NUM_REGS 3
 #define VM_NUM_STACKSLOTS 6
-#define MEM_RAMSLOTS 3
 
 struct vm_status_t {
   uint8_t regs[VM_NUM_REGS];
-  uint8_t mem[MEM_RAMSLOTS];
 
   uint16_t pc;
 
