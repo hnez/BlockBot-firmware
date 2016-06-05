@@ -18,15 +18,10 @@ void rdbuf_init (struct rdbuf_t *buf)
 
 uint8_t rdbuf_len(struct rdbuf_t *buf)
 {
-  uint8_t len;
-  if(buf->resv.f.resv){
-    //TODO
-
-  }
-  else {
-    len= (buf->wrpos >= buf->rdpos) ?
+  uint8_t len= (buf->wrpos >= buf->rdpos) ?
       buf->wrpos - buf->rdpos : RDBUF_LEN - buf->rdpos + buf->wrpos;
-  }
+      /* The reservation should be counted aswell, since it
+      shifts the wrpos */
 
   return (len);
 }
