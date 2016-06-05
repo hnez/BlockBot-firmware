@@ -25,7 +25,7 @@ int main (void)
 
       if(rdbuf_len(&uart.buf)==0){
 
-        prep_AQ(&uart.buf);
+        //TODO prep_aq(&uart.buf);
       } /* else finishing transmission */
       /* When the buffer ran empty immediatelly uart.flags.forward==0,
          therefore this shouldnt lead to an unwanted second iteration */
