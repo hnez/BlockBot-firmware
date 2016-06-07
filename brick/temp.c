@@ -1,3 +1,8 @@
+/*###############DISCLAMER#################
+ * There is no need to check this file,
+   I just didnt want to delete the code
+ *#######################################*/
+
 uint8_t prep_AQ(struct rdbuf_t *buf)
 {
 
