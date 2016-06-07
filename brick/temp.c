@@ -94,3 +94,120 @@ uint8_t prep_AQ(struct rdbuf_t *buf)
   rdbuf_finish_resv(buf);
   return (0);
 }
+
+
+int16_t nth_packet_index(uint16_t packet uint8_t n){
+  /* find the nth packet of a type */
+
+  if(n==0) return (-5);
+
+  uint16_t packet_index, brick_word;
+  uint8_t i = 0;
+
+  for(packet_index=0;packet_index<EEPROM_SPACE;packet_index++){
+    brick_word = eeprom_read_word(packet_index);
+
+    if(brick_word==packet){
+      i++;
+      if(i==n) break;
+    }
+
+    if(brick_word==CHAIN_AQ || brick_word==BRICK_CONT
+        || brick_word==BRICK_NAME || brick_word==BRICK_BC
+        || brick_word==BRICK_PREP || brick_word==TMTY_BRNR
+        || brick_word==TMTY_BAT || brick_word==PGM_DATA
+        || brick_word==PGM_STAT || brick_word==ERR_TX){
+      packet_index+= eeprom_read_word(packet_index+2) + EEPROM_HDR_LEN -1;
+      /* -1 because packet_index++ */
+    }
+  }
+
+  if(packet_index>=EEPROM_SPACE - EEPROM_HDR_LEN){
+    /* Not found */
+    return (-1);
+  }
+
+  return packet_index;
+}
+
+int16_t packet_index_range(uint16_t f_index, uint16_t len){
+  /* find the first packet in a range */
+
+  if(f_index+len>=EEPROM_SPACE){
+    /* Range wider than EEPROM_SPACE */
+    return (-3);
+  }
+
+  uint16_t packet_index, brick_word;
+
+
+  for(packet_index=f_index;packet_index<f_index+len;packet_index++){
+    brick_word = eeprom_read_word(packet_index);
+
+
+    if(brick_word==CHAIN_AQ || brick_word==BRICK_CONT
+        || brick_word==BRICK_NAME || brick_word==BRICK_BC
+        || brick_word==BRICK_PREP || brick_word==TMTY_BRNR
+        || brick_word==TMTY_BAT || brick_word==PGM_DATA
+        || brick_word==PGM_STAT || brick_word==ERR_TX){
+      return packet_index;
+    }
+  }
+
+
+  /* Not found */
+  return (-1);
+}
+
+int16_t packet_index(uint16_t packet){
+  /* find the first packet of a type */
+
+
+  uint16_t packet_index, brick_word;
+
+  for(packet_index=0;packet_index<EEPROM_SPACE;packet_index++){
+    brick_word = eeprom_read_word(packet_index);
+
+    if(brick_word==packet){
+      break;
+    }
+
+    /* Other packet */
+    else if(brick_word==CHAIN_AQ || brick_word==BRICK_CONT
+        || brick_word==BRICK_NAME || brick_word==BRICK_BC
+        || brick_word==BRICK_PREP || brick_word==TMTY_BRNR
+        || brick_word==TMTY_BAT || brick_word==PGM_DATA
+        || brick_word==PGM_STAT || brick_word==ERR_TX){
+      packet_index+= eeprom_read_word(packet_index+2) + EEPROM_HDR_LEN -1;
+      /* -1 because packet_index++ */
+    }
+  }
+
+  if(packet_index>=EEPROM_SPACE - EEPROM_HDR_LEN){
+    /* Not found */
+    return (-1);
+  }
+
+  return packet_index;
+}
+
+/*
+int16_t old_nth_subpacket(uint16_t cont_index, uint8_t n){
+
+  int16_t ith_index;
+  uint16_t ith_xedni = cont_index + EEPROM_HDR_LEN;
+
+  for(uint8_t i=0;i<n;i++){
+    ith_index = packet_index_range(ith_xedni,eeprom_read_word(cont_index+2));
+
+    if(ith_index<0){
+
+      return (ith_index);
+    }
+
+    ith_xedni += eeprom_read_word(ith_index+2);
+  }
+
+  return ith_index;
+}
+*/
