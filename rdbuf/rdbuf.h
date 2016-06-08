@@ -34,5 +34,5 @@ uint8_t rdbuf_len(struct rdbuf_t *);
 int8_t rdbuf_push (struct rdbuf_t *, char);
 int8_t rdbuf_pop (struct rdbuf_t *, char *);
 int8_t rdbuf_reserve (struct rdbuf_t *buf, uint8_t count);
-int8_t rdbuf_finish_resv (struct rdbuf_t *buf);
+int8_t rdbuf_fin_resv (struct rdbuf_t *buf);
 int8_t rdbuf_put_resv (struct rdbuf_t *buf, uint8_t pos, char val);

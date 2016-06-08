@@ -48,11 +48,11 @@ struct {
                           actively clocked mode for */
   uint16_t total_len;   /* guess it */
   uint8_t bitnum;
-  uint16_t packet_index; /* The current position in a
+  uint16_t pkt_index; /* The current position in a
                             packet transmission */
-  char packet_header_rcvd[UA_AQHDR_LEN]; /* The received header
+  char pkt_header_rcvd[UA_AQHDR_LEN]; /* The received header
                                           of the previous block */
-  char packet_header_send[UA_AQHDR_LEN]; /* The header for the next
+  char pkt_header_send[UA_AQHDR_LEN]; /* The header for the next
                                           block */
   /*
    * The structure below encodes the current
@@ -121,20 +121,20 @@ ISR(PCINT0_vect)
     uart.flags.rcving_header= 1;
     uart.flags.snding_header= 0;
 
-    uart.packet_index = 0;
-    bzero(uart.packet_header_rcvd, UA_AQHDR_LEN);
-    bzero(uart.packet_header_send, UA_AQHDR_LEN);
+    uart.pkt_index = 0;
+    bzero(uart.pkt_header_rcvd, UA_AQHDR_LEN);
+    bzero(uart.pkt_header_send, UA_AQHDR_LEN);
     uart.passive_len= UA_HDR_LEN;
   }
-  else if (uart.packet_index<=1) {}  /* Not enough data to do anything */
+  else if (uart.pkt_index<=1) {}  /* Not enough data to do anything */
   else if (uart.flags.transmission && uart.flags.snding_header) {
 
-    if (uart.packet_index==2) {
+    if (uart.pkt_index==2) {
       /* eval Mnemonic */
-      if (uart.packet_header_rcvd[0]==0x0
-          && uart.packet_header_rcvd[1]==0x1) { /* rcvd AQ req */
-        uart.packet_header_send[0]=0x0; /* send AQ */
-        uart.packet_header_send[1]=0x1; /* send AQ */
+      if (uart.pkt_header_rcvd[0]==0x0
+          && uart.pkt_header_rcvd[1]==0x1) { /* rcvd AQ req */
+        uart.pkt_header_send[0]=0x0; /* send AQ */
+        uart.pkt_header_send[1]=0x1; /* send AQ */
         uart.flags.snding_header= 1;
         uart.flags.forward= 1;
       }
@@ -142,10 +142,10 @@ ISR(PCINT0_vect)
          but other features are considered optional for now. */
     }
 
-    if(uart.packet_index==4) {
+    if(uart.pkt_index==4) {
       /* eval packet length */
-      uart.active_len = (uint16_t)(uart.packet_header_rcvd[2] << 8)
-        | (uint16_t)(uart.packet_header_rcvd[3]);
+      uart.active_len = (uint16_t)(uart.pkt_header_rcvd[2] << 8)
+        | (uint16_t)(uart.pkt_header_rcvd[3]);
 
       uart.total_len = uart.passive_len +
                               rdbuf_len(&uart.buf) +
@@ -154,16 +154,16 @@ ISR(PCINT0_vect)
                               uart.active_len;
       /* If AQ, CKSUM_len is already in active_len */
 
-      uart.packet_header_send[2] = (uint8_t) (uart.total_len >> 8);
-      uart.packet_header_send[3] = (uint8_t) (uart.total_len & 0xFF);
+      uart.pkt_header_send[2] = (uint8_t) (uart.total_len >> 8);
+      uart.pkt_header_send[3] = (uint8_t) (uart.total_len & 0xFF);
     }
 
     /* Check if header is rcvd */
-    if (uart.packet_index>=4) {
-      if (uart.packet_header_rcvd[0]==0x00
-          && uart.packet_header_rcvd[1]==0x01) {
+    if (uart.pkt_index>=4) {
+      if (uart.pkt_header_rcvd[0]==0x00
+          && uart.pkt_header_rcvd[1]==0x01) {
         /* rcvd AQ */
-        if (uart.packet_index==6) {
+        if (uart.pkt_index==6) {
           /* cksum rcvd */
           uart.flags.rcving_header = 0;
 
@@ -180,10 +180,10 @@ ISR(PCINT0_vect)
            * uart.packet_header_send[5] = newsum;
            */
 
-          uart.packet_header_send[4] = 0;
-          uart.packet_header_send[5] = 0;
+          uart.pkt_header_send[4] = 0;
+          uart.pkt_header_send[5] = 0;
         }
-        if (uart.packet_index==8) {
+        if (uart.pkt_index==8) {
           /* cksum sent */
           uart.flags.snding_header = 0;
           /* Finally end this condition tree */
@@ -197,14 +197,14 @@ ISR(PCINT0_vect)
     }
   }
   /* When active_clock is needed */
-  else if (uart.packet_index==uart.active_len + 3){
+  else if (uart.pkt_index==uart.active_len + 3){
     uart.flags.active_clock = 1;
     /* This case needs to be handled
        right after the stop bit of the last passive byte
        because this is the last time this interrupt is called */
   }
 
-  uart.packet_index++;
+  uart.pkt_index++;
   uart.bitnum= 0;
 }
 
@@ -228,8 +228,8 @@ ISR(TIMER0_COMPA_vect)
     }
     else if (uart.flags.snding_header && uart.flags.forward) {
       /* Handle Mnemonic, Length, optional Checksum */
-      if(uart.packet_index > 2){
-        b_send = uart.packet_header_send[uart.packet_index-3];
+      if(uart.pkt_index > 2){
+        b_send = uart.pkt_header_send[uart.pkt_index-3];
       } /* else { dont send because uart.flags.forward==0 } */
     }
   }
@@ -254,12 +254,12 @@ ISR(TIMER0_COMPA_vect)
       }
     }
     else {
-      uart.packet_header_rcvd[uart.packet_index-1] = b_rcvd;
+      uart.pkt_header_rcvd[uart.pkt_index-1] = b_rcvd;
     }
 
     /* active_clock */
     if(uart.flags.active_clock){
-      if (uart.packet_index<uart.total_len + UA_HDR_LEN){
+      if (uart.pkt_index<uart.total_len + UA_HDR_LEN){
         // Prepare interrupt for next cycle, compare match int is still enabled
         OCR0A= pgm_read_byte(&uart_times[0]);
 
@@ -267,7 +267,7 @@ ISR(TIMER0_COMPA_vect)
          * to zero, reach uart_times[0] and start a new cycle */
         TCNT0= 255 - UA_BYTE_GAP_TIME;
 
-        uart.packet_index++;
+        uart.pkt_index++;
         uart.bitnum= 0;
       }
       /* When everything is transfered */

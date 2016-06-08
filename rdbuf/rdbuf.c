@@ -100,7 +100,7 @@ int8_t rdbuf_reserve (struct rdbuf_t *buf, uint8_t count)
   return (0);
 }
 
-int8_t rdbuf_finish_resv (struct rdbuf_t *buf)
+int8_t rdbuf_fin_resv (struct rdbuf_t *buf)
 {
   if(!buf->resv.f.resv){
     /* No reservation */
