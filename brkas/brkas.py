@@ -248,7 +248,7 @@ def main(args):
         lines.append(' bytecode_in bytecode.bc            - Bytecode output file')
         lines.append(' source_out sourcefile.brkas        - Disassembly file')
         lines.append(' bytecode_out bytecode.bc           - Assembly file')
-        lines.append(' brickfile_out brickfile.brf        - Flashable brick file')
+        lines.append(' brick_out brickfile.brf            - Flashable brick file')
         lines.append(' specification_out specification.md - Bytecode specification')
         lines.append('')
         lines.append('example:')
