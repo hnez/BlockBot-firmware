@@ -31,6 +31,10 @@ flash: $(PROGNAME).elf
 fuse:
 	$(FLASHPROG) $(FLASHFLAGS) $(FUSES)
 
+.PHONY: size
+size: $(PROGNAME).elf
+	avr-size -C --mcu=$(CPU) $(PROGNAME).elf
+
 .PHONY: tests
 tests: $(TEST_TGT)
 
