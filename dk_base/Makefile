@@ -1,5 +1,5 @@
 PROGNAME= robot
-CPU= atmega328
+CPU= atmega328p
 FREQ= 12000000
 SOURCES= $(PROGNAME).c motor.c timer.c buttons.c leds.c vm_ram.c
 CFLAGS+= -I../interpreter -I ../saxparse
