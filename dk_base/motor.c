@@ -4,25 +4,25 @@
 
 #include "motor.h"
 
-#define MOT1A_DDR  DDRA
-#define MOT1A_PORT PORTA
-#define MOT1A_NUM  PA7
+#define MOT1A_DDR  DDRD
+#define MOT1A_PORT PORTD
+#define MOT1A_NUM  PD6
 #define MOT1A_PWM  OCR0B
 #define MOT1A_INV  COM0A0
 
-#define MOT1B_DDR  DDRA
-#define MOT1B_PORT PORTA
-#define MOT1B_NUM  PA0
+#define MOT1B_DDR  DDRC
+#define MOT1B_PORT PORTC
+#define MOT1B_NUM  PC2
 
-#define MOT2A_DDR  DDRB
-#define MOT2A_PORT PORTB
-#define MOT2A_NUM  PB2
+#define MOT2A_DDR  DDRD
+#define MOT2A_PORT PORTD
+#define MOT2A_NUM  PD5
 #define MOT2A_PWM  OCR0A
 #define MOT2A_INV  COM0B0
 
-#define MOT2B_DDR  DDRA
-#define MOT2B_PORT PORTA
-#define MOT2B_NUM  PA1
+#define MOT2B_DDR  DDRC
+#define MOT2B_PORT PORTC
+#define MOT2B_NUM  PC1
 
 uint8_t mem_getmot (__attribute__((unused)) struct vm_status_t *vm,
                     uint8_t addr, uint8_t *val)

@@ -2,9 +2,9 @@
 
 #include <vm.h>
 
-#define LED_DDR  DDRA
-#define LED_PORT PORTA
-#define LED_NUM  PA6
+#define LED_DDR  DDRD
+#define LED_PORT PORTD
+#define LED_NUM  PD7
 
 #ifndef NULL
 #define NULL ((void*)0)

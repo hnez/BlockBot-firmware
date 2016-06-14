@@ -39,7 +39,7 @@ uint8_t mem_settimer (__attribute__((unused)) struct vm_status_t *vm,
   return (MEM_OK);
 }
 
-ISR(TIM0_OVF_vect)
+ISR(TIMER1_OVF_vect)
 {
   timer-=STEPSIZE;
 
