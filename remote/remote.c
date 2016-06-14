@@ -10,9 +10,11 @@ int main (void)
 {
   pwr_self(POWER_ON);
 
-  led_error(5);
-
-  for (;;);
+  for (;;) {
+    if (pwr_chkovc()) {
+      led_error(LED_EOVERCURR);
+    }
+  }
 
   return (0);
 }
