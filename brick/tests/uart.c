@@ -4,11 +4,11 @@
 
 int tests_run = 0;
 
-// struct rdbuf_t {
-//   char last_byte;
-//   int should_fail;
-//   int len;
-// };
+struct rdbuf_t {
+  char last_byte;
+  int should_fail;
+  int len;
+};
 
 struct {
   uint8_t ddrb;
@@ -50,6 +50,27 @@ struct {
 
 #define pgm_read_byte(ptr) (*((uint8_t *)ptr))
 
+void rdbuf_init (__attribute__((unused)) struct rdbuf_t *buf)
+{
+}
+
+uint8_t rdbuf_len(struct rdbuf_t *buf)
+{
+  return buf->len;
+}
+
+int8_t rdbuf_push (struct rdbuf_t *buf, char val)
+{
+  buf->last_byte= val;
+
+  return buf->should_fail;
+}
+
+int8_t rdbuf_pop (struct rdbuf_t *buf, char *val)
+{
+  *val=0;
+  return buf->should_fail;
+}
 
 #define __UNIT_TEST__
 #define main main_orig
@@ -173,6 +194,9 @@ static char *test_receive()
       symbol>>=1;
     }
 
+    mu_assert("Did not propperly receive",
+              uart.buf.last_byte == msg[i]);
+
     mu_assert("Did not re-enable pcint",
               GIMSK & _BV(PCIE));
 
@@ -184,8 +208,8 @@ static char *test_receive()
   return (0);
 }
 
-static char *all_tests()
-{
+
+static char *all_tests() {
   mu_run_test(test_bittimes);
 
   mu_run_test(test_init);

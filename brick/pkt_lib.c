@@ -1,3 +1,7 @@
+//###########################################################
+//#TODO Replace eeprom_read_word with 2x eeprom_read_byte   #
+//###########################################################
+
 #include <avr/io.h>
 #include "descriptor.h"
 
