@@ -25,15 +25,13 @@ int main (void)
   int16_t signed_brick_cont_index =
              nth_pkt_by_type(BRICK_CONT, 0, EEPROM_SPACE, 1);
   uint16_t brick_cont_index;
+  /* Is probably 0 */
 
   /* Check if valid */
   if(signed_brick_cont_index>0){
-    /* Two's complement to unsigned */
-    brick_cont_index =
-          ~(1 << 15) & ~((uint16_t)signed_brick_cont_index - 1);
+    brick_cont_index = (uint16_t)signed_brick_cont_index;
   } else {
-    /* No BRICK_CONT found */
-    return (-1);
+    return (-1); /* No BRICK_CONT found */
   }
 
   /* Get BRICK_CONT length */
@@ -43,8 +41,8 @@ int main (void)
 
   if(signed_brick_cont_payload_len>0){
     brick_cont_payload_len =
-            ~(1 << 15) & ~((uint16_t)signed_brick_cont_payload_len - 1);
-  } /* else { Imposible Error } */
+            (uint16_t)signed_brick_cont_payload_len;
+  } /* else { Impossible Error } */
 
   /* ################################ */
 
@@ -84,7 +82,7 @@ uint8_t make_aq(){
 
   /* push everything that isnt BRICK_PREP */
   for(pkt_index+= 1;
-        pkt_index<brick_cont_index + EEPROM_HDR_LEN + eeprom_read_word(brick_cont_index+2);
+        pkt_index < brick_cont_index + EEPROM_HDR_LEN + eeprom_read_word(brick_cont_index+2);
         pkt_index++){
 
     shift(&brick_word, eeprom_read_byte(pkt_index));

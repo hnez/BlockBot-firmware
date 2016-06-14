@@ -1,8 +1,10 @@
-#include <avr/io.h>
+#ifndef __UNIT_TEST__
+  // Do not load avr headers in unit test code
+  #include <avr/io.h>
+#endif
 
 #include "rdbuf.h"
-
-
+typedef uint16_t rdbufidx_t;
 
 void rdbuf_init (struct rdbuf_t *buf)
 {
@@ -14,7 +16,6 @@ void rdbuf_init (struct rdbuf_t *buf)
   buf->resv.len = 0;
   buf->resv.f.resv = 0;
 }
-
 
 uint8_t rdbuf_len(struct rdbuf_t *buf)
 {
@@ -48,7 +49,6 @@ int8_t rdbuf_push (struct rdbuf_t *buf, char val)
   return (0);
 }
 
-
 int8_t rdbuf_pop (struct rdbuf_t *buf, char *val)
 {
   if (!rdbuf_len(buf)) {
@@ -71,8 +71,7 @@ int8_t rdbuf_pop (struct rdbuf_t *buf, char *val)
   }
 }
 
-
-int8_t rdbuf_reserve (struct rdbuf_t *buf, uint8_t count)
+int8_t rdbuf_reserve (struct rdbuf_t *buf, uint16_t count)
 {
   if(buf->resv.f.resv){
     /* Already a reservation */
@@ -121,7 +120,7 @@ int8_t rdbuf_fin_resv (struct rdbuf_t *buf)
   return (0);
 }
 
-int8_t rdbuf_put_resv (struct rdbuf_t *buf, uint8_t pos, char val)
+int8_t rdbuf_put_resv (struct rdbuf_t *buf, uint16_t pos, char val)
 {
   if(!buf->resv.f.resv){
     /* No reservation */

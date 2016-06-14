@@ -4,11 +4,11 @@
 
 int tests_run = 0;
 
-struct rdbuf_t {
-  char last_byte;
-  int should_fail;
-  int len;
-};
+// struct rdbuf_t {
+//   char last_byte;
+//   int should_fail;
+//   int len;
+// };
 
 struct {
   uint8_t ddrb;
@@ -50,34 +50,13 @@ struct {
 
 #define pgm_read_byte(ptr) (*((uint8_t *)ptr))
 
-void rdbuf_init (__attribute__((unused)) struct rdbuf_t *buf)
-{
-}
-
-uint8_t rdbuf_len(struct rdbuf_t *buf)
-{
-  return buf->len;
-}
-
-int8_t rdbuf_push (struct rdbuf_t *buf, char val)
-{
-  buf->last_byte= val;
-
-  return buf->should_fail;
-}
-
-int8_t rdbuf_pop (struct rdbuf_t *buf, char *val)
-{
-  *val=0;
-  return buf->should_fail;
-}
 
 #define __UNIT_TEST__
 #define main main_orig
 
 #include "../uart.c"
 
-#include <malloc.h>
+#include <stdlib.h>
 #include <strings.h>
 #include <string.h> //??
 
@@ -86,7 +65,7 @@ int8_t rdbuf_pop (struct rdbuf_t *buf, char *val)
 void reset_globals()
 {
   bzero(&globals, sizeof(globals));
-  bzero(&uart_status, sizeof(uart_status));
+  bzero(&uart, sizeof(uart));
 }
 
 static char *test_bittimes()
@@ -131,9 +110,9 @@ static char *test_pcint_nostartbit()
 
   // Backup global state
   void *oldglobals= malloc(sizeof(globals));
-  void *olduartstatus= malloc(sizeof(uart_status));
+  void *olduartstatus= malloc(sizeof(uart));
   memcpy(oldglobals, &globals, sizeof(globals));
-  memcpy(olduartstatus, &uart_status, sizeof(uart_status));
+  memcpy(olduartstatus, &uart, sizeof(uart));
 
   // Execute interrupt handler
   PCINT0_vect();
@@ -141,8 +120,8 @@ static char *test_pcint_nostartbit()
   mu_assert("PCINT changed registers but there was no start bit",
             !memcmp(oldglobals, &globals, sizeof(globals)));
 
-  mu_assert("PCINT changed uart_status but there was no start bit",
-            !memcmp(olduartstatus, &uart_status, sizeof(uart_status)));
+  mu_assert("PCINT changed uart but there was no start bit",
+            !memcmp(olduartstatus, &uart, sizeof(uart)));
 
   return 0;
 }
@@ -164,7 +143,7 @@ static char *test_pcint_startbit()
             TIMSK & _BV(OCIE0A));
 
   mu_assert("Bit number was not set up",
-            uart_status.bitnum == 0);
+            uart.bitnum == 0);
 
   return 0;
 }
@@ -194,9 +173,6 @@ static char *test_receive()
       symbol>>=1;
     }
 
-    mu_assert("Did not propperly receive",
-              uart_status.buf.last_byte == msg[i]);
-
     mu_assert("Did not re-enable pcint",
               GIMSK & _BV(PCIE));
 
@@ -208,8 +184,8 @@ static char *test_receive()
   return (0);
 }
 
-
-static char *all_tests() {
+static char *all_tests()
+{
   mu_run_test(test_bittimes);
 
   mu_run_test(test_init);
