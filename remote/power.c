@@ -5,6 +5,7 @@
 
 #include "power.h"
 
+#include "led.h"
 
 void pwr_self(uint8_t is_on)
 {
@@ -34,7 +35,10 @@ void pwr_bricks (uint8_t is_on)
 uint8_t pwr_chkovc (void)
 {
   if (PINC & _BV(PC0)) {
+
     pwr_bricks(POWER_OFF);
+
+    led_error(LED_EOVERCURR);
     return (1);
   }
 

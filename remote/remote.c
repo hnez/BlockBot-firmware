@@ -9,12 +9,13 @@
 int main (void)
 {
   pwr_self(POWER_ON);
+  led_init();
 
-  for (;;) {
-    if (pwr_chkovc()) {
-      led_error(LED_EOVERCURR);
-    }
-  }
+  pwr_bricks(POWER_ON);
+
+  // TODO
+
+  pwr_self(POWER_OFF);
 
   return (0);
 }

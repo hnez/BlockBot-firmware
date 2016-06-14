@@ -12,7 +12,7 @@ void uart_init(void)
 {
   UBRRH = UBRRH_VALUE;
   UBRRL = UBRRL_VALUE;
-  
+
   #if USE_2X
     UCSRA |= (1 << U2X);
   #else
