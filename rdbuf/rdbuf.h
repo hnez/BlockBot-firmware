@@ -2,7 +2,7 @@
 
 
 
-#define RDBUF_LEN 32
+#define RDBUF_LEN 8
 typedef uint16_t rdbufidx_t;
 
 
@@ -13,14 +13,15 @@ struct rdbuf_t {
   char buf[RDBUF_LEN];
 
   struct {
+    uint8_t resv : 1; /* reservation flag */
+    uint8_t full : 1;
+  } f; /* flags */
+
+  struct {
     rdbufidx_t resvpos; /*current write position */
     rdbufidx_t f_byte; /* First reservated byte */
     rdbufidx_t l_byte; /* Last reservated byte */
     rdbufidx_t len;
-
-    struct {
-      uint8_t resv : 1; /* reservation flag */
-    } f; /* flags */
   } resv;
 
 };

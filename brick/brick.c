@@ -88,7 +88,7 @@ uint8_t make_aq(){
   /* init */
   uint16_t pkt_index = brick_cont.index + EEPROM_HDR_LEN;
   uint16_t brick_word = (uint16_t)eeprom_read_byte(pkt_index);
-  uint16_t resv_index = AQ_HDR_LEN;
+  uint16_t resv_index = AQ_HDR_LEN + EEPROM_HDR_LEN;
 
 
   /* push everything that isnt BRICK_PREP */
@@ -149,14 +149,13 @@ uint8_t make_aq(){
   rdbuf_put_resv(&uart.buf, 0, 0x0); /* AQ1 */
   rdbuf_put_resv(&uart.buf, 1, 0x1); /* AQ2 */
   uint16_t aq_len = brick_cont.len +
-  (uint16_t)(uart.pkt_header_rcvd[2] << 8) | (uint16_t)(uart.pkt_header_rcvd[3])
-  + 2; /* CKSUM */
+  (uint16_t)(uart.pkt_header_rcvd[2] << 8) | (uint16_t)(uart.pkt_header_rcvd[3]); /* CKSUM in pkt_header_rcvd */
   rdbuf_put_resv(&uart.buf, 2, (uint8_t)(8 >> aq_len));
   rdbuf_put_resv(&uart.buf, 3, (uint8_t)(aq_len&0xFF));
 
   /* TODO CKSUM */
-  dbuf_put_resv(&uart.buf, 4, 0x0);
-  dbuf_put_resv(&uart.buf, 5, 0x0);
+  rdbuf_put_resv(&uart.buf, 4, 0x0);
+  rdbuf_put_resv(&uart.buf, 5, 0x0);
 
   rdbuf_fin_resv(&uart.buf);
 }

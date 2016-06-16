@@ -41,7 +41,8 @@
 
 /*------------------------dependent-methods-------------------------*/
 
-int16_t brick_cont_len_without_prep(uint16_t cont_index){
+int16_t brick_cont_len_without_prep(uint16_t cont_index)
+{
   /* get the length of a container minus the BRICK_PREP len */
 
   uint16_t brick_cont = eeprom_read_word(cont_index);
@@ -81,27 +82,29 @@ int16_t brick_cont_len_without_prep(uint16_t cont_index){
 
 
 
-int16_t nth_subpkt_by_type(uint16_t pkt, uint16_t cont_index, uint8_t n){
-
+int16_t nth_subpkt_by_type(uint16_t pkt, uint16_t cont_index, uint8_t n)
+{
   return (nth_pkt_by_type(pkt, cont_index+EEPROM_HDR_LEN, eeprom_read_word(cont_index+2), n));
 }
 
 
 
-int16_t nth_subpkt_by_index(uint16_t cont_index, uint8_t n){
-
+int16_t nth_subpkt_by_index(uint16_t cont_index, uint8_t n)
+{
   return (nth_pkt_by_index(cont_index+EEPROM_HDR_LEN, eeprom_read_word(cont_index+2), n));
 }
 
 
 
 /*------------------------independent-methods-------------------------*/
-void shift(uint16_t *word, uint8_t byte){
+void shift(uint16_t *word, uint8_t byte)
+{
   *word = (word << 8) | (uint16_t)byte;
 }
 
 
-int16_t nth_pkt_by_type(uint16_t pkt, uint16_t f_index, uint16_t len, uint8_t n){
+int16_t nth_pkt_by_type(uint16_t pkt, uint16_t f_index, uint16_t len, uint8_t n)
+{
   /* find the nth packet of a type */
 
   if(n==0) return (-5);
@@ -150,7 +153,8 @@ int16_t nth_pkt_by_type(uint16_t pkt, uint16_t f_index, uint16_t len, uint8_t n)
 
 
 
-int16_t nth_pkt_by_index(uint16_t f_index, uint16_t len, uint8_t n){
+int16_t nth_pkt_by_index(uint16_t f_index, uint16_t len, uint8_t n)
+{
   /* find the nth packet */
 
   if(n==0) return (-5);
