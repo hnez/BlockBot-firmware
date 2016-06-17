@@ -7,15 +7,12 @@
 
 
   #include <rdbuf.h>
+  #include <pkt_parser.h>
   #include "uart.h"
-  #include "pkt_lib.h"
+
 #endif
 
-#define BRICK_CONT 0x0100
 
-#define AQ_HDR_LEN 6 /* Mnemonic, payload_length, CKSUM */
-#define EEPROM_HDR_LEN 4 /* Mnemonic, payload_length */
-#define EEPROM_SPACE 512 /* bytes */
 
 struct {
   uint16_t index;
