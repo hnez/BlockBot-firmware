@@ -2,7 +2,7 @@
 # $ make CPU=attiny44 FREQ=1000000
 
 AR= avr-ar
-SOURCES= pkt_parser.c
+SOURCES= pktpsr.c
 
 .PHONY: gen
 gen : librdbuf.$(CPU)-$(FREQ).a

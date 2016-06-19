@@ -4,6 +4,8 @@ FREQ= 8000000
 SOURCES= $(PROGNAME).c uart.c
 CFLAGS+= -I../rdbuf
 CFLAGS+= -L../rdbuf
+CFLAGS+= -I../pktpsr
+CFLAGS+= -L../pktpsr
 LIBS= -lrdbuf.$(CPU)-$(FREQ)
 ATGTS+= librdbuf.$(CPU)-$(FREQ).a
 

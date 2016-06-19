@@ -25,7 +25,7 @@ char v_eeprom[108] = {0x01, 0x00, 0x00, 0x32, 0x01, 0x01, 0x00, 0x07, 0x46, 0x77
 #define __UNIT_TEST__
 #define main main_orig
 
-#include "../pkt_parser.c"
+#include "../pktpsr.c"
 
 #include <stdlib.h>
 #include <strings.h>

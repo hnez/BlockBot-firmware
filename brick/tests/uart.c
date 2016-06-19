@@ -73,6 +73,7 @@ int8_t rdbuf_pop (struct rdbuf_t *buf, char *val)
 }
 
 #define __UNIT_TEST__
+
 #define main main_orig
 
 #include "../uart.c"

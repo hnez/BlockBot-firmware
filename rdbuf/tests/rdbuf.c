@@ -108,14 +108,15 @@ static char *test_resv()
     mu_assert("rdbuf_pop error", rdbuf_pop(&buffer, &val)>=0);
     mu_assert("rdbuf_pop val is not 2", val=='2');
   }
-  
+
   return (0);
 }
 
 static char *all_tests()
 {
   //mu_run_test(test_init);
-  //is fine
+  //ridiculous
+  
   rdbuf_init(&buffer);
 
   for(uint8_t i=0; i<RDBUF_LEN; i++){

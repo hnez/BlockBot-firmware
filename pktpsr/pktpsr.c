@@ -3,7 +3,7 @@
   #include <avr/eeprom.h>
 #endif
 
-#include "pkt_parser.h"
+#include "pktpsr.h"
 #include <stdbool.h>
 
 
@@ -12,10 +12,6 @@
 
 
 /*------------------------independent-methods-------------------------*/
-void shift(uint16_t *word, uint8_t byte)
-{
-  *word = (*word << 8) | (uint16_t)byte;
-}
 
 
 int16_t nth_pkt_by_type(uint16_t pkt, uint16_t f_index, uint16_t len, uint8_t n)
