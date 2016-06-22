@@ -48,88 +48,89 @@ uint8_t init_brick_cont(){
   return (0);
 }
 
-uint8_t make_aq(){
-  //
-  // /* Reserve the precalculated len */
-  // rdbuf_reserve(&uart.buf,
-  //           AQ_HDR_LEN + EEPROM_HDR_LEN + brick_cont.len);
-  //       /*                BRICK_CONT_HDR                   */
-  //
-  //
-  // /* init */
-  // uint16_t pkt_index = brick_cont.index + EEPROM_HDR_LEN;
-  // uint16_t brick_word = (uint16_t)eeprom_read_byte(pkt_index);
-  // uint16_t resv_index = AQ_HDR_LEN + EEPROM_HDR_LEN;
-  //
-  //
-  // /* push everything that isnt BRICK_PREP */
-  // for(pkt_index+= 1;
-  //       pkt_index < brick_cont.index + EEPROM_HDR_LEN +  brick_cont.total_len;
-  //       pkt_index++){
-  //
-  //   brick_word = (brick_word << 8) | (uint16_t)eeprom_read_byte(pkt_index);
-  //
-  //   if(brick_word==BRICK_PREP){
-  //
-  //     /* Skip the paket
-  //      *     payload_length     HDR_restlenght */
-  //     pkt_index += (uint16_t)(eeprom_read_byte(pkt_index+1) << 8) +
-  //                    (uint16_t)(eeprom_read_byte(pkt_index+2)) + 3;
-  //
-  //     /* init brick_word for next loop */
-  //     brick_word = (uint16_t)eeprom_read_byte(pkt_index);;
-  //   }
-  //   else {
-  //     /* If not BRICK_PREP, put byte in buffer */
-  //     rdbuf_put_resv(&uart.buf, resv_index, (uint8_t)(brick_word >> 8));
-  //     resv_index++;
-  //   }
-  // }
-  //
-  //
-  // /* init */
-  // pkt_index = brick_cont.index + EEPROM_HDR_LEN;
-  // brick_word = (uint16_t)eeprom_read_byte(pkt_index);
-  //
-  // /* run BRICK_PREP */
-  // for(pkt_index+=1;
-  //        pkt_index < brick_cont.index + EEPROM_HDR_LEN + brick_cont.total_len;
-  //        pkt_index++){
-  //
-  //   brick_word = (brick_word << 8) | (uint16_t)eeprom_read_byte(pkt_index);
-  //
-  //   if(brick_word == BRICK_PREP){
-  //     //rdbuf_put_resv(&uart.buf, pos, val);
-  //     /* TODO Leonard */
-  //
-  //
-  //     /* Skip the paket
-  //      *     payload_length     HDR_restlenght */
-  //      pkt_index += (uint16_t)(eeprom_read_byte(pkt_index+1) << 8) +
-  //                     (uint16_t)(eeprom_read_byte(pkt_index+2)) + 3;
-  //
-  //     /* init brick_word for next loop */
-  //     brick_word = (uint16_t)eeprom_read_byte(pkt_index);;
-  //   }
-  // }
-  //
-  //
-  // /* Create AQ header
-  //  * As the length of the receiving paket must be known first
-  //  * this happens at last */
-  // rdbuf_put_resv(&uart.buf, 0, 0x0); /* AQ1 */
-  // rdbuf_put_resv(&uart.buf, 1, 0x1); /* AQ2 */
-  // uint16_t aq_len = brick_cont.len +
-  // (uint16_t)(uart.pkt_header_rcvd[2] << 8) | (uint16_t)(uart.pkt_header_rcvd[3]); /* CKSUM in pkt_header_rcvd */
-  // rdbuf_put_resv(&uart.buf, 2, (uint8_t)(8 >> aq_len));
-  // rdbuf_put_resv(&uart.buf, 3, (uint8_t)(aq_len&0xFF));
-  //
-  // /* TODO CKSUM */
-  // rdbuf_put_resv(&uart.buf, 4, 0x0);
-  // rdbuf_put_resv(&uart.buf, 5, 0x0);
-  //
-  // rdbuf_fin_resv(&uart.buf);
-  //
+uint8_t make_aq()
+{
+
+  /* Reserve the precalculated len */
+  rdbuf_reserve(&uart.buf,
+            AQ_HDR_LEN + EEPROM_HDR_LEN + brick_cont.len);
+        /*                BRICK_CONT_HDR                   */
+
+
+  /* init */
+  uint16_t pkt_index = brick_cont.index + EEPROM_HDR_LEN;
+  uint16_t brick_word = (uint16_t)eeprom_read_byte(pkt_index);
+  uint16_t resv_index = AQ_HDR_LEN + EEPROM_HDR_LEN;
+
+
+  /* push everything that isnt BRICK_PREP */
+  for(pkt_index+= 1;
+        pkt_index < brick_cont.index + EEPROM_HDR_LEN +  brick_cont.total_len;
+        pkt_index++){
+
+    brick_word = (brick_word << 8) | (uint16_t)eeprom_read_byte(pkt_index);
+
+    if(brick_word==BRICK_PREP){
+
+      /* Skip the paket
+       *     payload_length     HDR_restlenght */
+      pkt_index += (uint16_t)(eeprom_read_byte(pkt_index+1) << 8) +
+                     (uint16_t)(eeprom_read_byte(pkt_index+2)) + 3;
+
+      /* init brick_word for next loop */
+      brick_word = (uint16_t)eeprom_read_byte(pkt_index);;
+    }
+    else {
+      /* If not BRICK_PREP, put byte in buffer */
+      rdbuf_put_resv(&uart.buf, resv_index, (uint8_t)(brick_word >> 8));
+      resv_index++;
+    }
+  }
+
+
+  /* init */
+  pkt_index = brick_cont.index + EEPROM_HDR_LEN;
+  brick_word = (uint16_t)eeprom_read_byte(pkt_index);
+
+  /* run BRICK_PREP */
+  for(pkt_index+=1;
+         pkt_index < brick_cont.index + EEPROM_HDR_LEN + brick_cont.total_len;
+         pkt_index++){
+
+    brick_word = (brick_word << 8) | (uint16_t)eeprom_read_byte(pkt_index);
+
+    if(brick_word == BRICK_PREP){
+      //rdbuf_put_resv(&uart.buf, pos, val);
+      /* TODO Leonard */
+
+
+      /* Skip the paket
+       *     payload_length     HDR_restlenght */
+       pkt_index += (uint16_t)(eeprom_read_byte(pkt_index+1) << 8) +
+                      (uint16_t)(eeprom_read_byte(pkt_index+2)) + 3;
+
+      /* init brick_word for next loop */
+      brick_word = (uint16_t)eeprom_read_byte(pkt_index);;
+    }
+  }
+
+
+  /* Create AQ header
+   * As the length of the receiving paket must be known first
+   * this happens at last */
+  rdbuf_put_resv(&uart.buf, 0, 0x0); /* AQ1 */
+  rdbuf_put_resv(&uart.buf, 1, 0x1); /* AQ2 */
+  uint16_t aq_len = brick_cont.len +
+  (uint16_t)(uart.pkt_header_rcvd[2] << 8) | (uint16_t)(uart.pkt_header_rcvd[3]); /* CKSUM in pkt_header_rcvd */
+  rdbuf_put_resv(&uart.buf, 2, (uint8_t)(8 >> aq_len));
+  rdbuf_put_resv(&uart.buf, 3, (uint8_t)(aq_len&0xFF));
+
+  /* CKSUM Placeholder */
+  rdbuf_put_resv(&uart.buf, 4, 0x0);
+  rdbuf_put_resv(&uart.buf, 5, 0x0);
+
+  rdbuf_fin_resv(&uart.buf);
+
   return (0);
 }
 

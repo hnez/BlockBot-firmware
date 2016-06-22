@@ -6,6 +6,10 @@
 #define UA_AQHDR_LEN (UA_HDR_LEN+2) // + Checksum
 #define BRICK_CONT 0x0100
 
+#define EEPROM_HDR_LEN 4 /* Mnemonic, payload_length */
+#define AQ_HDR_LEN 6 /* Mnemonic, payload_length, CKSUM */
+
+#define BRICK_PREP 0x0103
 
 int tests_run = 0;
 
@@ -61,6 +65,23 @@ int8_t rdbuf_pop (struct rdbuf_t *buf, char *val)
   *val=1;
   return (0);
 }
+
+int8_t rdbuf_reserve (struct rdbuf_t *buf, uint16_t count)
+{
+  if(buf->neccesary>0){}
+  if(count>1){}
+  return (0);
+}
+
+int8_t rdbuf_put_resv (struct rdbuf_t *buf, uint16_t pos, char val)
+{
+  if(buf->neccesary>0){}
+  if(pos==0){}
+  if(val==0){}
+  return (0);
+}
+
+
 
 int16_t nth_pkt_by_type(uint16_t pkt, uint16_t f_index, uint16_t len, uint8_t n)
 {
