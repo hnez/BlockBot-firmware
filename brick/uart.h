@@ -11,7 +11,6 @@ struct {
   uint16_t total_len;
   uint8_t bitnum;
   uint16_t rcvd_index;
-  uint16_t send_index;
 
   char aq_hdr_rcvd[UA_AQHDR_LEN]; /* The received header
                                           of the previous block */
@@ -27,6 +26,7 @@ struct {
    *  forward       - is set, when for every received byte a byte should be
    *                  transmitted.
    *                  e.g. when forwarding a aquisition request
+   *  rcving_header - is set, while reveiving the previous header
    */
 
   struct {

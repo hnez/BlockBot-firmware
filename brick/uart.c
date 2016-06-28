@@ -32,7 +32,7 @@
 #define PING_TMR_PRESCALE_NUM 1024
 
 // For F_CPU ATtiny clock and prescaler value of UA_TMR_PRESCALE_NUM
-const uint8_t uart_times[] PROGMEM = {
+const uint8_t uart_times[] PROGMEM= {
   UART_BITTIME(0),  // Start bit
   UART_BITTIME(1), UART_BITTIME(2), UART_BITTIME(3), UART_BITTIME(4), // Data bits
   UART_BITTIME(5), UART_BITTIME(6), UART_BITTIME(7), UART_BITTIME(8),
@@ -76,22 +76,29 @@ ISR(PCINT0_vect)
     uart.flags.transmission= 1;
     uart.flags.active_clock= 0;
     uart.flags.forward= 1;
+    uart.flags.rcving_header= 1;
 
-    uart.rcvd_index = 0;
-    uart.send_index = 0;
+    uart.rcvd_index= 0;
+    uart.send_index= 0;
 
     uart.bitnum= 0;
     return;
   }
-
-  //TODO CLOCKED ->
-  if (uart.rcvd_index==(((uint16_t)(uart.aq_hdr_rcvd[2] << 8) | (uint16_t)uart.header_rcvd[3]) + 3){
-    uart.flags.active_clock = 1;
-    /* This case needs to be handled
-       right after the stop bit of the last passive byte
-       because this is the last time this interrupt is called */
+  // may check if aq later
+  else if (uart.rcvd_index== 3) {
+    uart.passive_len = (uint16_t)(uart.aq_hdr_rcvd[2] << 8)
+                      | (uint16_t)uart.aq_hdr_rcvd[3];
   }
-  //<-
+  else if (uart.rcvd_index==5){
+    // assumes aq, may check cksum later
+    uart.flags.rcving_header= 0;
+  }
+
+  /* This should be the last PC interrupt.
+   * TODO check if off by one error */
+  if (3 + uart.rcvd_index - 1==uart.passive_len){
+    uart.flags.active_clock= 1;
+  }
 
   uart.rcvd_index++;
   uart.bitnum= 0;
@@ -104,12 +111,12 @@ ISR(TIMER0_COMPA_vect)
   static uint8_t b_send, b_rcvd= 0x00; /* rcvd==received */
 
 
-  if (uart.bitnum == 0) { // start bit
+  if (uart.bitnum== 0) { // start bit
     b_rcvd= 0x00;
 
     if (uart.flags.forward) {
       // Load next buffer byte
-      uint8_t bufstat = rdbuf_pop(&uart.buf, (char *) &b_send);
+      uint8_t bufstat= rdbuf_pop(&uart.buf, (char *) &b_send);
 
       // TODO is bufstat==BUFFER_EMPTY && !uart.flags.active_clock possible?
       if (bufstat==BUFFER_EMPTY && uart.flags.active_clock) {
@@ -118,10 +125,11 @@ ISR(TIMER0_COMPA_vect)
         // TODO: Transmission complete
       }
       else if (bufstat==HIT_RESV) {
-        // transmit nothing
-        b_send = 0xFF;
+        /* transmit nothing until
+         * resv is finished */
+        b_send= 0xFF;
       }
-      else {
+      else /* if (bufstat>0) */ {
         // Forward the start bit if forwarding is requested
         TX_PORT&= ~_BV(TX_NUM);
       }
@@ -143,20 +151,19 @@ ISR(TIMER0_COMPA_vect)
       if (rdbuf_push(&uart.buf, b_rcvd) < 0) {
         /* The buffer is full. Everything will break.
          * This should not happen */
-        uart.flags.transmission= 0;
-        return;
+         // panic();
       }
     }
     else {
-      uart.aq_hdr_rcvd[uart.rcvd_index] = b_rcvd;
+      uart.aq_hdr_rcvd[uart.rcvd_index]= b_rcvd;
       if (uart.rcvd_index >= 5) {
         uart.flags.rcving_header= 0;
       }
     }
 
-    /* TODO active_clock */
+
     if(uart.flags.active_clock){
-      if (uart.pkt_index<uart.total_len + UA_HDR_LEN){
+      if (rdbuf_len(&uart.buf)>0){
         // Prepare interrupt for next cycle, compare match int is still enabled
         OCR0A= pgm_read_byte(&uart_times[0]);
 
@@ -164,7 +171,6 @@ ISR(TIMER0_COMPA_vect)
          * to zero, reach uart_times[0] and start a new cycle */
         TCNT0= 255 - UA_BYTE_GAP_TIME;
 
-        uart.pkt_index++;
         uart.bitnum= 0;
       }
       /* When everything is transfered */
@@ -197,7 +203,7 @@ ISR(TIMER0_COMPA_vect)
       b_send>>=1;
     }
 
-    if (uart.bitnum == 8 && !uart.flags.active_clock) {
+    if (uart.bitnum== 8 && !uart.flags.active_clock) {
       /*
        * #USBSerialConvertersSuck
        * The sender might decide to send the next
