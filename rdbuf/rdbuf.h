@@ -1,6 +1,8 @@
 #pragma once
 
 
+#define BUFFER_EMPTY -1
+#define HIT_RESV -2
 
 #define RDBUF_LEN 8
 typedef uint16_t rdbufidx_t;

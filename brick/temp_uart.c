@@ -8,7 +8,7 @@
   #include <rdbuf.h>
 #endif
 
-#include <string.h> /* nessessary? */
+#include <string.h>
 #define bzero(dst, size) memset(dst, 0, size)
 
 #define BAUD_RATE 9600
@@ -73,61 +73,126 @@ ISR(PCINT0_vect)
     // This is not a byte expected by an active
     // transmission. So start one
 
+
+
     uart.flags.transmission= 1;
     uart.flags.active_clock= 0;
-    uart.flags.forward= 1;
+    uart.flags.forward= 0;
+    uart.flags.rcving_header= 1;
+    uart.flags.snding_header= 0;
 
-    uart.rcvd_index = 0;
-    uart.send_index = 0;
-
-    uart.bitnum= 0;
-    return;
+    uart.pkt_index = 0;
+    bzero(uart.pkt_header_rcvd, UA_AQHDR_LEN);
+    bzero(uart.pkt_header_send, UA_AQHDR_LEN);
+    uart.passive_len= UA_HDR_LEN;
   }
+  else if (uart.pkt_index<=1) {}  /* Not enough data to do anything */
+  else if (uart.flags.transmission && uart.flags.snding_header) {
 
-  //TODO CLOCKED ->
-  if (uart.rcvd_index==(((uint16_t)(uart.aq_hdr_rcvd[2] << 8) | (uint16_t)uart.header_rcvd[3]) + 3){
+    if (uart.pkt_index==2) {
+      /* eval Mnemonic */
+      if (uart.pkt_header_rcvd[0]==0x0
+          && uart.pkt_header_rcvd[1]==0x1) { /* rcvd AQ req */
+        uart.pkt_header_send[0]=0x0; /* send AQ */
+        uart.pkt_header_send[1]=0x1; /* send AQ */
+        uart.flags.snding_header= 1;
+        uart.flags.forward= 1;
+      }
+      /* TODO Handle things except AQ like brick reprogramming
+         but other features are considered optional for now. */
+    }
+
+    if(uart.pkt_index==4) {
+      /* eval packet length */
+      uart.active_len = (uint16_t)(uart.pkt_header_rcvd[2] << 8)
+        | (uint16_t)(uart.pkt_header_rcvd[3]);
+
+      uart.total_len = uart.passive_len +
+                              rdbuf_len(&uart.buf) +
+      /* The reservation should be counted aswell, since it
+      shifts the wrpos */
+                              uart.active_len;
+      /* If AQ, CKSUM_len is already in active_len */
+
+      uart.pkt_header_send[2] = (uint8_t) (uart.total_len >> 8);
+      uart.pkt_header_send[3] = (uint8_t) (uart.total_len & 0xFF);
+    }
+
+    /* Check if header is rcvd */
+    if (uart.pkt_index>=4) {
+      if (uart.pkt_header_rcvd[0]==0x00
+          && uart.pkt_header_rcvd[1]==0x01) {
+        /* rcvd AQ */
+        if (uart.pkt_index==6) {
+          /* cksum rcvd */
+          uart.flags.rcving_header = 0;
+
+          /* TODO Calculate new CKSUM (see IP checksum for refernce):
+           * uint32_t sum;
+           * for (uint16_t i; i<payloadlen; i++) {
+           *   sum+= payload[i];
+           * }
+           * while (sum >> 16) {
+           *   sum += sum >> 16;
+           * }
+           * newsum= (uint16_t)oldsum - (uint16_t)sum;
+           * uart.packet_header_send[4] = newsum>>8;
+           * uart.packet_header_send[5] = newsum;
+           */
+
+          uart.pkt_header_send[4] = 0;
+          uart.pkt_header_send[5] = 0;
+        }
+        if (uart.pkt_index==8) {
+          /* cksum sent */
+          uart.flags.snding_header = 0;
+          /* Finally end this condition tree */
+        }
+      }
+      else {
+        /* Things except AQ dont have a CKSUM */
+        uart.flags.rcving_header = 0;
+        uart.flags.snding_header = 0;
+      }
+    }
+  }
+  /* When active_clock is needed */
+  else if (uart.pkt_index==uart.active_len + 3){
     uart.flags.active_clock = 1;
     /* This case needs to be handled
        right after the stop bit of the last passive byte
        because this is the last time this interrupt is called */
   }
-  //<-
 
-  uart.rcvd_index++;
+  uart.pkt_index++;
   uart.bitnum= 0;
 }
-
-
 
 ISR(TIMER0_COMPA_vect)
 {
   static uint8_t b_send, b_rcvd= 0x00; /* rcvd==received */
 
-
   if (uart.bitnum == 0) { // start bit
     b_rcvd= 0x00;
 
-    if (uart.flags.forward) {
+    if (uart.flags.forward && !uart.flags.snding_header) {
       // Load next buffer byte
-      uint8_t bufstat = rdbuf_pop(&uart.buf, (char *) &b_send);
-
-      // TODO is bufstat==BUFFER_EMPTY && !uart.flags.active_clock possible?
-      if (bufstat==BUFFER_EMPTY && uart.flags.active_clock) {
+      if (rdbuf_pop(&uart.buf, (char *) &b_send) < 0) {
         // The buffer ran empty
         uart.flags.forward= 0;
-        // TODO: Transmission complete
-      }
-      else if (bufstat==HIT_RESV) {
-        // transmit nothing
-        b_send = 0xFF;
       }
       else {
         // Forward the start bit if forwarding is requested
         TX_PORT&= ~_BV(TX_NUM);
       }
     }
+    else if (uart.flags.snding_header && uart.flags.forward) {
+      /* Handle Mnemonic, Length, optional Checksum */
+      if(uart.pkt_index > 2){
+        b_send = uart.pkt_header_send[uart.pkt_index-3];
+      } /* else { dont send because uart.flags.forward==0 } */
+    }
   }
-
   else if (uart.bitnum >= 9) { // stop bit
     if (uart.flags.forward) {
       // Forward the stop bit if forwarding is requested
@@ -138,23 +203,21 @@ ISR(TIMER0_COMPA_vect)
      * #USBSerialConvertersSuck */
 
     if (!uart.flags.rcving_header) {
-       /* The header is not meant for the buffer */
-
+      /* This is the reason why two seperate headerflags are nessessary
+       * The header is not meant for the buffer */
       if (rdbuf_push(&uart.buf, b_rcvd) < 0) {
-        /* The buffer is full. Everything will break.
-         * This should not happen */
+        // The buffer is full. This should not happen
+
         uart.flags.transmission= 0;
+
         return;
       }
     }
     else {
-      uart.aq_hdr_rcvd[uart.rcvd_index] = b_rcvd;
-      if (uart.rcvd_index >= 5) {
-        uart.flags.rcving_header= 0;
-      }
+      uart.pkt_header_rcvd[uart.pkt_index-1] = b_rcvd;
     }
 
-    /* TODO active_clock */
+    /* active_clock */
     if(uart.flags.active_clock){
       if (uart.pkt_index<uart.total_len + UA_HDR_LEN){
         // Prepare interrupt for next cycle, compare match int is still enabled
@@ -185,7 +248,7 @@ ISR(TIMER0_COMPA_vect)
 
     if (RX_PIN & _BV(RX_NUM)) {
       // Sender sent a high bit
-      b_rcvd|= _BV(8);
+      b_rcvd|= _BV(7);
     }
 
     if (uart.flags.forward) {
@@ -220,8 +283,10 @@ ISR(TIMER0_COMPA_vect)
   OCR0A= pgm_read_byte(&uart_times[uart.bitnum]);
 }
 
+ISR(TIMER1_COMPA_vect)
+{
 
-
+}
 
 void uart_init(void)
 {
