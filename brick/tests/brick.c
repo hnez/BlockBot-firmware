@@ -19,7 +19,7 @@ struct rdbuf_t {
 
 struct {
   struct rdbuf_t buf;
-  char pkt_header_rcvd[UA_AQHDR_LEN];
+  char aq_hdr_rcvd[UA_AQHDR_LEN];
 
   struct {
     uint8_t forward : 1;
@@ -81,6 +81,11 @@ int8_t rdbuf_put_resv (struct rdbuf_t *buf, uint16_t pos, char val)
   return (0);
 }
 
+int8_t rdbuf_fin_resv (struct rdbuf_t *buf)
+{
+  if(buf->neccesary>0){}
+  return (0);
+}
 
 
 int16_t nth_pkt_by_type(uint16_t pkt, uint16_t f_index, uint16_t len, uint8_t n)

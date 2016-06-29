@@ -121,7 +121,7 @@ uint8_t make_aq()
   rdbuf_put_resv(&uart.buf, 0, 0x0); /* AQ1 */
   rdbuf_put_resv(&uart.buf, 1, 0x1); /* AQ2 */
   uint16_t aq_len = brick_cont.len +
-  (uint16_t)(uart.pkt_header_rcvd[2] << 8) | (uint16_t)(uart.pkt_header_rcvd[3]); /* CKSUM in pkt_header_rcvd */
+  (uint16_t)(uart.aq_hdr_rcvd[2] << 8) | (uint16_t)(uart.aq_hdr_rcvd[3]); /* CKSUM in aq_hdr_rcvd */
   rdbuf_put_resv(&uart.buf, 2, (uint8_t)(8 >> aq_len));
   rdbuf_put_resv(&uart.buf, 3, (uint8_t)(aq_len&0xFF));
 
@@ -147,8 +147,8 @@ int main (void)
 
     /* AQ received */
     if(uart.flags.forward==1
-        && uart.pkt_header_rcvd[0]==0x0
-          && uart.pkt_header_rcvd[1]==0x1){
+        && uart.aq_hdr_rcvd[0]==0x0
+          && uart.aq_hdr_rcvd[1]==0x1){
 
       if(rdbuf_len(&uart.buf)==0){
 
