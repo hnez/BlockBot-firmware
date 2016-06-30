@@ -19,7 +19,7 @@ struct rdbuf_t {
 
 struct {
   struct rdbuf_t buf;
-  char pkt_header_rcvd[UA_AQHDR_LEN];
+  char aq_hdr_rcvd[UA_AQHDR_LEN];
 
   struct {
     uint8_t forward : 1;

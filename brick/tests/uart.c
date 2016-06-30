@@ -20,7 +20,10 @@ struct {
   uint8_t tccr0b;
   uint8_t gimsk;
   uint8_t pcmsk;
-}globals;
+} globals;
+
+#define BUFFER_EMPTY -1
+#define HIT_RESV -2
 
 
 #define DDRB   (globals.ddrb)
@@ -68,7 +71,7 @@ int8_t rdbuf_push (struct rdbuf_t *buf, char val)
 
 int8_t rdbuf_pop (struct rdbuf_t *buf, char *val)
 {
-  *val=0;
+  *val=8;
   return buf->should_fail;
 }
 
@@ -122,6 +125,8 @@ static char *test_init()
   return 0;
 }
 
+
+
 static char *test_pcint_nostartbit()
 {
   reset_globals();
@@ -138,6 +143,7 @@ static char *test_pcint_nostartbit()
 
   // Execute interrupt handler
   PCINT0_vect();
+
 
   mu_assert("PCINT changed registers but there was no start bit",
             !memcmp(oldglobals, &globals, sizeof(globals)));
@@ -159,7 +165,7 @@ static char *test_pcint_startbit()
   PCINT0_vect();
 
   mu_assert("Timer wakeup time was not set correctly",
-            OCR0A != 0 && TCNT0==0 && (TCCR0B & 0x07) != 0);
+            OCR0A != 0 && (TCCR0B & UA_TMR_PRESCALE_REG) != 0);
 
   mu_assert("Timer interrupt was not enabled",
             TIMSK & _BV(OCIE0A));
@@ -189,36 +195,49 @@ static char *test_receive()
     for (int j=0;j<=9;j++) {
       if (symbol & 1) PINB |= _BV(PB3);
       else PINB &= ~_BV(PB3);
+      //printf("RX_PIN set to: %x\n", ((RX_PIN&_BV(RX_NUM))&&1));
 
       TIMER0_COMPA_vect();
+
+      //printf("TX_PORT was set to: %x\n", ((TX_PORT&_BV(TX_NUM))&&1));
 
       symbol>>=1;
     }
 
-    mu_assert("Did not propperly receive",
-              uart.buf.last_byte == msg[i]);
+    printf("RX Expected: %x\n", msg[i]);
+    if(i<=5){
+      printf("RX Got: %x\n", uart.aq_hdr_rcvd[i]);
+      mu_assert("Did not propperly receive header",
+                uart.aq_hdr_rcvd[i] == msg[i]);
+    }
+    else {
+      printf("Got: %X\n", uart.buf.last_byte);
+      mu_assert("Did not propperly receive payload",
+                uart.buf.last_byte == msg[i]);
+    }
+    printf("-----------------\n");
 
     mu_assert("Did not re-enable pcint",
               GIMSK & _BV(PCIE));
 
     mu_assert("Did not disable timer interrupt",
-              !(TIMSK & _BV(OCIE0A)));
-
+              !(TIMSK & _BV(OCIE0A)) || uart.flags.active_clock);
   }
-
+  mu_assert("passive_len is wrong", uart.passive_len==((uint16_t)(uart.aq_hdr_rcvd[2] << 8)
+                                                          | (uint16_t)uart.aq_hdr_rcvd[3]));
+  mu_assert("active_clock wasnt turned on", uart.flags.active_clock);
   return (0);
 }
 
-
 static char *all_tests() {
-  mu_run_test(test_bittimes);
 
+  mu_run_test(test_bittimes);
   mu_run_test(test_init);
+
   mu_run_test(test_pcint_nostartbit);
   mu_run_test(test_pcint_startbit);
 
   mu_run_test(test_receive);
-
   return 0;
 }
 

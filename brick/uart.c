@@ -8,6 +8,8 @@
   #include <rdbuf.h>
 #endif
 
+#include "uart.h"
+
 #include <string.h> /* nessessary? */
 #define bzero(dst, size) memset(dst, 0, size)
 
@@ -25,7 +27,7 @@
 
 #define UA_TMR_PRESCALE_REG (_BV(CS01) | _BV(CS00))
 #define UA_TMR_PRESCALE_NUM 64
-#define UA_BYTE_GAP_TIME UART_BITTIME 4 // About half a byte of delay
+#define UA_BYTE_GAP_TIME UART_BITTIME(9) / 2 // About half a byte of delay
 
 
 #define PING_TMR_PRESCALE_REG (_BV(CS02) | _BV(CS00)) // Not in use yet
@@ -79,7 +81,6 @@ ISR(PCINT0_vect)
     uart.flags.rcving_header= 1;
 
     uart.rcvd_index= 0;
-    uart.send_index= 0;
 
     uart.bitnum= 0;
     return;
@@ -87,8 +88,9 @@ ISR(PCINT0_vect)
   // may check if aq later
   else if (uart.rcvd_index== 3) {
     uart.passive_len = (uint16_t)(uart.aq_hdr_rcvd[2] << 8)
-                      | (uint16_t)uart.aq_hdr_rcvd[3];
+      | (uint16_t)uart.aq_hdr_rcvd[3];
   }
+
   else if (uart.rcvd_index==5){
     // assumes aq, may check cksum later
     uart.flags.rcving_header= 0;
@@ -96,7 +98,8 @@ ISR(PCINT0_vect)
 
   /* This should be the last PC interrupt.
    * TODO check if off by one error */
-  if (3 + uart.rcvd_index - 1==uart.passive_len){
+
+  if (uart.rcvd_index==uart.passive_len + 2) {
     uart.flags.active_clock= 1;
   }
 
@@ -113,10 +116,12 @@ ISR(TIMER0_COMPA_vect)
 
   if (uart.bitnum== 0) { // start bit
     b_rcvd= 0x00;
+    //printf("b_rcvd: %X\n", (char)b_rcvd);
 
     if (uart.flags.forward) {
       // Load next buffer byte
-      uint8_t bufstat= rdbuf_pop(&uart.buf, (char *) &b_send);
+
+      int8_t bufstat= rdbuf_pop(&uart.buf, (char *) &b_send);
 
       // TODO is bufstat==BUFFER_EMPTY && !uart.flags.active_clock possible?
       if (bufstat==BUFFER_EMPTY && uart.flags.active_clock) {
@@ -161,9 +166,9 @@ ISR(TIMER0_COMPA_vect)
       }
     }
 
+    if (uart.flags.active_clock) {
+      if (rdbuf_len(&uart.buf)>0) {
 
-    if(uart.flags.active_clock){
-      if (rdbuf_len(&uart.buf)>0){
         // Prepare interrupt for next cycle, compare match int is still enabled
         OCR0A= pgm_read_byte(&uart_times[0]);
 
@@ -193,6 +198,7 @@ ISR(TIMER0_COMPA_vect)
       // Sender sent a high bit
       b_rcvd|= _BV(8);
     }
+    //printf("b_rcvd: %x\n", b_rcvd);
 
     if (uart.flags.forward) {
       // Forward the data bit if forwarding is requested
