@@ -48,8 +48,7 @@ int8_t rdbuf_push (struct rdbuf_t *buf, char val)
 int8_t rdbuf_pop (struct rdbuf_t *buf, char *val)
 {
   if (!rdbuf_len(buf)) {
-    /* Buffer empty */
-    return (-1);
+    return (BUFFER_EMPTY);
   }
 
   if(buf->rdpos!=buf->resv.f_byte || !buf->f.resv){
@@ -66,7 +65,7 @@ int8_t rdbuf_pop (struct rdbuf_t *buf, char *val)
   }
   else { /* {buf->rdpos==buf->resv.f_byte && buf->f.resv} */
     /* rdpos hit resv */
-    return (-2);
+    return (HIT_RESV);
   }
 }
 
