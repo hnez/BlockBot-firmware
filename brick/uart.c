@@ -196,7 +196,7 @@ ISR(TIMER0_COMPA_vect)
 
     if (RX_PIN & _BV(RX_NUM)) {
       // Sender sent a high bit
-      b_rcvd|= _BV(8);
+      b_rcvd|= _BV(7);
     }
     //printf("b_rcvd: %x\n", b_rcvd);
 
