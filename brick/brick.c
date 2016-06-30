@@ -121,7 +121,7 @@ uint8_t make_aq()
   rdbuf_put_resv(&uart.buf, 0, 0x0); /* AQ1 */
   rdbuf_put_resv(&uart.buf, 1, 0x1); /* AQ2 */
   uint16_t aq_len = brick_cont.len +
-  (uint16_t)(uart.aq_hdr_rcvd[2] << 8) | (uint16_t)(uart.aq_hdr_rcvd[3]); /* CKSUM in aq_hdr_rcvd */
+  (uint16_t)(uart.hdr_rvcd[2] << 8) | (uint16_t)(uart.hdr_rvcd[3]); /* CKSUM in hdr_rvcd */
   rdbuf_put_resv(&uart.buf, 2, (uint8_t)(8 >> aq_len));
   rdbuf_put_resv(&uart.buf, 3, (uint8_t)(aq_len&0xFF));
 
@@ -141,21 +141,34 @@ int main (void)
 
   init_brick_cont();
   uart_init();
+  communicate();
   sei();
 
   for(;;){
 
     /* AQ received */
-    if(uart.flags.forward==1
-        && uart.aq_hdr_rcvd[0]==0x0
-          && uart.aq_hdr_rcvd[1]==0x1){
+    if(!uart.flags.aq_complete
+        && uart.hdr_rvcd[0]==0x0
+          && uart.hdr_rvcd[1]==0x1){
 
       if(rdbuf_len(&uart.buf)==0){
 
         make_aq();
       } /* else finishing transmission */
-      /* When the buffer ran empty immediatelly uart.flags.forward==0,
+      /* When the buffer ran empty uart.flags.rcving_header==0,
          therefore this shouldnt lead to an unwanted second iteration */
+    }
+    /* first brick, start aq */
+    if(uart.flags.first_brick
+       && !uart.flags.aq_complete) {
+      if(rdbuf_len(&uart.buf)==0){
+
+        make_aq();
+      } /* else finishing transmission */
+    }
+
+    if (uart.flags.aq_complete) {
+      return (0);
     }
   }
   return (0);

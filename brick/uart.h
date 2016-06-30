@@ -12,7 +12,7 @@ struct {
   uint8_t bitnum;
   uint16_t rcvd_index;
 
-  char aq_hdr_rcvd[UA_AQHDR_LEN]; /* The received header
+  char hdr_rvcd[UA_AQHDR_LEN]; /* The received header
                                           of the previous block */
   /*
    * The structure below encodes the current
@@ -33,8 +33,13 @@ struct {
     uint8_t transmission : 1;
     uint8_t active_clock : 1;
     uint8_t forward : 1;
+    uint8_t backward : 1;
     uint8_t rcving_header : 1;
+    uint8_t ping_rcvd : 1;
+    uint8_t first_brick : 1;
+    uint8_t aq_complete : 1;
   } flags;
 } uart;
 
 void uart_init(void);
+void communicate(void);

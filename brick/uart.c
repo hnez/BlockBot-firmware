@@ -30,8 +30,8 @@
 #define UA_BYTE_GAP_TIME UART_BITTIME(9) / 2 // About half a byte of delay
 
 
-#define PING_TMR_PRESCALE_REG (_BV(CS02) | _BV(CS00)) // Not in use yet
-#define PING_TMR_PRESCALE_NUM 1024
+#define PING_TMR_PRESCALE_REG (_BV(CS13) | _BV(CS11))
+#define PING_TMR_PRESCALE_NUM 512
 
 // For F_CPU ATtiny clock and prescaler value of UA_TMR_PRESCALE_NUM
 const uint8_t uart_times[] PROGMEM= {
@@ -42,7 +42,7 @@ const uint8_t uart_times[] PROGMEM= {
 };
 
 
-
+//Accepting a new transmission and continuing it
 ISR(PCINT0_vect)
 {
   if (RX_PIN & _BV(RX_NUM)) {
@@ -74,10 +74,12 @@ ISR(PCINT0_vect)
   if (!uart.flags.transmission) {
     // This is not a byte expected by an active
     // transmission. So start one
+    bzero(&uart.hdr_rvcd, sizeof(uart.hdr_rvcd));
 
     uart.flags.transmission= 1;
     uart.flags.active_clock= 0;
-    uart.flags.forward= 1;
+    uart.flags.forward= 0;
+    uart.flags.backward= 1;
     uart.flags.rcving_header= 1;
 
     uart.rcvd_index= 0;
@@ -86,9 +88,25 @@ ISR(PCINT0_vect)
     return;
   }
   // may check if aq later
+  else if (uart.rcvd_index== 1) {
+    // aq
+    if(uart.hdr_rvcd[0]==0x00 && uart.hdr_rvcd[1]==0x01) {
+      uart.flags.forward= 1;
+    }
+    //ping
+    else if(uart.hdr_rvcd[0]==0x00 && uart.hdr_rvcd[1]==0x02) {
+
+      uart.flags.ping_rcvd= 1;
+      TCCR0B= 0;
+
+      /* wait for aq */
+      GIMSK|= _BV(PCIE);
+      uart.flags.transmission= 0;
+    }
+  }
   else if (uart.rcvd_index== 3) {
-    uart.passive_len = (uint16_t)(uart.aq_hdr_rcvd[2] << 8)
-      | (uint16_t)uart.aq_hdr_rcvd[3];
+    uart.passive_len = (uint16_t)(uart.hdr_rvcd[2] << 8)
+      | (uint16_t)uart.hdr_rvcd[3];
   }
 
   else if (uart.rcvd_index==5){
@@ -96,9 +114,7 @@ ISR(PCINT0_vect)
     uart.flags.rcving_header= 0;
   }
 
-  /* This should be the last PC interrupt.
-   * TODO check if off by one error */
-
+  /* This should be the last PC interrupt. */
   if (uart.rcvd_index==uart.passive_len + 2) {
     uart.flags.active_clock= 1;
   }
@@ -107,6 +123,43 @@ ISR(PCINT0_vect)
   uart.bitnum= 0;
 }
 
+
+ISR(TIMER1_OVF_vect)
+{
+  /* time is over, there was no ping ->
+   * Starting a new transmission manual */
+   if (!uart.flags.ping_rcvd) {
+
+     /* starts make_aq */
+     uart.flags.first_brick= 1;
+
+     OCR0A= pgm_read_byte(&uart_times[0]);
+     TIMSK|= _BV(OCIE0A);
+     TCNT0= 0;
+     TCCR0B= UA_TMR_PRESCALE_REG;
+
+     /* Disable Pin change interrupts while the transmission
+      * is active */
+     GIMSK&= ~_BV(PCIE);
+
+     uart.flags.transmission= 1;
+     uart.flags.active_clock= 1;
+     uart.flags.forward= 1;
+     uart.flags.backward= 0;
+
+     uart.bitnum= 0;
+
+     /* make_aq() should start now, because
+      * uart.flags.first_brick && !uart.flags.aq_complete */
+   }
+   else {
+     /* Disable this interrupt */
+     TIMSK&= ~_BV(TOEI1);
+
+     /* Stop timer */
+     TCCR1= 0;
+   }
+}
 
 
 ISR(TIMER0_COMPA_vect)
@@ -123,11 +176,19 @@ ISR(TIMER0_COMPA_vect)
 
       int8_t bufstat= rdbuf_pop(&uart.buf, (char *) &b_send);
 
-      // TODO is bufstat==BUFFER_EMPTY && !uart.flags.active_clock possible?
+
       if (bufstat==BUFFER_EMPTY && uart.flags.active_clock) {
         // The buffer ran empty
-        uart.flags.forward= 0;
-        // TODO: Transmission complete
+        uart.flags.transmission= 0;
+        // Transmission complete
+        if(uart.hdr_rvcd[0]==0x0
+              && uart.hdr_rvcd[1]==0x1){
+                uart.flags.aq_complete= 1;
+        }
+        else { /* ping complete, continue */
+          GIMSK|= _BV(PCIE);
+        }
+
       }
       else if (bufstat==HIT_RESV) {
         /* transmit nothing until
@@ -150,19 +211,21 @@ ISR(TIMER0_COMPA_vect)
     /* Dont verify that a correct stop bit was received
      * #USBSerialConvertersSuck */
 
-    if (!uart.flags.rcving_header) {
-       /* The header is not meant for the buffer */
+    if (uart.flags.backward) {
+      if (!uart.flags.rcving_header) {
+         /* The header is not meant for the buffer */
 
-      if (rdbuf_push(&uart.buf, b_rcvd) < 0) {
-        /* The buffer is full. Everything will break.
-         * This should not happen */
-         // panic();
+        if (rdbuf_push(&uart.buf, b_rcvd) < 0) {
+          /* The buffer is full. Everything will break.
+           * This should not happen */
+           // panic();
+        }
       }
-    }
-    else {
-      uart.aq_hdr_rcvd[uart.rcvd_index]= b_rcvd;
-      if (uart.rcvd_index >= 5) {
-        uart.flags.rcving_header= 0;
+      else {
+        uart.hdr_rvcd[uart.rcvd_index]= b_rcvd;
+        if (uart.rcvd_index >= 5) {
+          uart.flags.rcving_header= 0;
+        }
       }
     }
 
@@ -192,13 +255,16 @@ ISR(TIMER0_COMPA_vect)
     }
   }
   else { // data bit
-    b_rcvd>>=1;
 
-    if (RX_PIN & _BV(RX_NUM)) {
-      // Sender sent a high bit
-      b_rcvd|= _BV(7);
+    if (uart.flags.backward) {
+      b_rcvd>>=1;
+
+      if (RX_PIN & _BV(RX_NUM)) {
+        // Sender sent a high bit
+        b_rcvd|= _BV(7);
+      }
+      //printf("b_rcvd: %x\n", b_rcvd);
     }
-    //printf("b_rcvd: %x\n", b_rcvd);
 
     if (uart.flags.forward) {
       // Forward the data bit if forwarding is requested
@@ -238,6 +304,9 @@ ISR(TIMER0_COMPA_vect)
 void uart_init(void)
 {
   uart.flags.transmission= 0;
+  uart.flags.ping_rcvd= 0;
+  uart.flags.first_brick= 0;
+  uart.flags.aq_complete= 0;
 
   // Set TX pin to driven high state
   TX_PORT&= ~_BV(TX_NUM);
@@ -246,4 +315,43 @@ void uart_init(void)
   /* Pin Change Interrupt Enable */
   PCMSK|= _BV(RX_NUM);
   GIMSK|= _BV(PCIE);
+
+}
+
+void communicate(void)
+{
+
+  /* Buffer should be empty */
+  if (rdbuf_len(&uart.buf)==0 && !uart.flags.transmission){
+
+    /* TODO Wait for some random time */
+
+    /*  Timer/Counter1 Overflow Interrupt Enable */
+    TIMSK|= _BV(TOEI1);
+    /* start ping_rcvd timer */
+    TCNT1= 0;
+    TCCR1= PING_TMR_PRESCALE_REG;
+
+    /* ping */
+    rdbuf_push(&uart.buf, 0x00);
+    rdbuf_push(&uart.buf, 0x02);
+
+    /* Send ping */
+    OCR0A= pgm_read_byte(&uart_times[0]);
+    TIMSK|= _BV(OCIE0A);
+    TCNT0= 0;
+    TCCR0B= UA_TMR_PRESCALE_REG;
+
+    /* Disable Pin change interrupts while the transmission
+     * is active */
+    GIMSK&= ~_BV(PCIE);
+
+    uart.flags.transmission= 1;
+    uart.flags.active_clock= 1;
+    uart.flags.forward= 1;
+    uart.flags.backward= 0;
+
+    uart.bitnum= 0;
+
+  } /* else there will be no ping */
 }

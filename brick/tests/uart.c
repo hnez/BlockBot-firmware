@@ -20,6 +20,9 @@ struct {
   uint8_t tccr0b;
   uint8_t gimsk;
   uint8_t pcmsk;
+  uint8_t toei1;
+  uint8_t tcnt1;
+  uint8_t tccr1;
 } globals;
 
 #define BUFFER_EMPTY -1
@@ -35,6 +38,9 @@ struct {
 #define TCCR0B (globals.tccr0b)
 #define GIMSK  (globals.gimsk)
 #define PCMSK  (globals.pcmsk)
+#define TOEI1  (globals.toei1)
+#define TCNT1  (globals.tcnt1)
+#define TCCR1  (globals.tccr1)
 
 #define F_CPU 8000000L
 
@@ -42,6 +48,9 @@ struct {
 #define PB3     3
 #define CS01    1
 #define CS00    0
+#define CS13    3
+#define CS11    1
+
 #define OCIE0A  4
 #define PCIE    5
 
@@ -206,9 +215,9 @@ static char *test_receive()
 
     printf("RX Expected: %x\n", msg[i]);
     if(i<=5){
-      printf("RX Got: %x\n", uart.aq_hdr_rcvd[i]);
+      printf("RX Got: %x\n", uart.hdr_rvcd[i]);
       mu_assert("Did not propperly receive header",
-                uart.aq_hdr_rcvd[i] == msg[i]);
+                uart.hdr_rvcd[i] == msg[i]);
     }
     else {
       printf("Got: %X\n", uart.buf.last_byte);
@@ -223,8 +232,8 @@ static char *test_receive()
     mu_assert("Did not disable timer interrupt",
               !(TIMSK & _BV(OCIE0A)) || uart.flags.active_clock);
   }
-  mu_assert("passive_len is wrong", uart.passive_len==((uint16_t)(uart.aq_hdr_rcvd[2] << 8)
-                                                          | (uint16_t)uart.aq_hdr_rcvd[3]));
+  mu_assert("passive_len is wrong", uart.passive_len==((uint16_t)(uart.hdr_rvcd[2] << 8)
+                                                          | (uint16_t)uart.hdr_rvcd[3]));
   mu_assert("active_clock wasnt turned on", uart.flags.active_clock);
   return (0);
 }

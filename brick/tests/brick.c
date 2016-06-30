@@ -19,10 +19,12 @@ struct rdbuf_t {
 
 struct {
   struct rdbuf_t buf;
-  char aq_hdr_rcvd[UA_AQHDR_LEN];
+  char hdr_rvcd[UA_AQHDR_LEN];
 
   struct {
-    uint8_t forward : 1;
+    uint8_t rcving_header : 1;
+    uint8_t first_brick : 1;
+    uint8_t aq_complete : 1;
   } flags;
 } uart;
 
@@ -32,6 +34,7 @@ struct {
 #define pgm_read_byte(ptr) (*((uint8_t *)ptr))
 #define sei()
 #define uart_init()
+#define communicate()
 
 char v_eeprom[108] = {0x01, 0x00, 0x00, 0x32, 0x01, 0x01, 0x00, 0x07, 0x46, 0x77,
                       0x64, 0x20, 0x43, 0x54, 0x43, 0x01, 0x03, 0x00, 0x04, 0x00,

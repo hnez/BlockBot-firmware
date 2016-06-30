@@ -10,6 +10,7 @@
 
 /* packets (16bit) */
 #define CHAIN_AQ 0x0001
+#define PING 0x0002
 
 #define BRICK_CONT 0x0100
 #define BRICK_NAME 0x0101
