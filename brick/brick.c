@@ -101,7 +101,7 @@ uint8_t make_aq()
 
     if(brick_word == BRICK_PREP){
       //rdbuf_put_resv(&uart.buf, pos, val);
-      /* TODO Leonard */
+      /* TODO */
 
 
       /* Skip the paket
