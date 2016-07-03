@@ -4,7 +4,7 @@
 #endif
 
 #include "rdbuf.h"
-typedef uint16_t rdbufidx_t;
+
 
 void rdbuf_init (struct rdbuf_t *buf)
 {
@@ -18,9 +18,9 @@ void rdbuf_init (struct rdbuf_t *buf)
   buf->f.full = 0;
 }
 
-uint8_t rdbuf_len(struct rdbuf_t *buf)
+uint16_t rdbuf_len(struct rdbuf_t *buf)
 {
-  uint8_t len= (buf->wrpos >= buf->rdpos) ?
+  uint16_t len= (buf->wrpos >= buf->rdpos) ?
       buf->wrpos - buf->rdpos : RDBUF_LEN - buf->rdpos + buf->wrpos;
       /* The reservation should be counted aswell, since it
       shifts the wrpos */
@@ -125,7 +125,7 @@ int8_t rdbuf_put_resv (struct rdbuf_t *buf, uint16_t pos, char val)
     return (-1);
   }
 
-  uint8_t real_pos = (pos + buf->resv.f_byte < RDBUF_LEN) ?
+  uint16_t real_pos = (pos + buf->resv.f_byte < RDBUF_LEN) ?
   buf->resv.f_byte + pos : pos + buf->resv.f_byte - RDBUF_LEN;
 
 

@@ -5,9 +5,9 @@ AR= avr-ar
 SOURCES= pktpsr.c
 
 .PHONY: gen
-gen : librdbuf.$(CPU)-$(FREQ).a
+gen : libpktpsr.$(CPU)-$(FREQ).a
 
-librdbuf.$(CPU)-$(FREQ).a: $(patsubst %.c, %.$(CPU)-$(FREQ).o, $(SOURCES))
+libpktpsr.$(CPU)-$(FREQ).a: $(patsubst %.c, %.$(CPU)-$(FREQ).o, $(SOURCES))
 	$(AR) rcs $@ $^
 
 %.$(CPU)-$(FREQ).o: %.c

@@ -25,11 +25,11 @@ int16_t nth_pkt_by_type(uint16_t pkt, uint16_t f_index, uint16_t len, uint8_t n)
   }
 
   uint16_t pkt_index = f_index;
-  uint16_t brick_word = (uint16_t)eeprom_read_byte(pkt_index);
+  uint16_t brick_word = (uint16_t)eeprom_read_byte((uint8_t *)pkt_index);
   uint8_t i = 0; /* counts from 0 to n*/
 
   for(pkt_index+= 1;pkt_index<f_index+len;pkt_index++){
-    brick_word = (brick_word << 8) | (uint16_t)eeprom_read_byte(pkt_index);
+    brick_word = (brick_word << 8) | (uint16_t)eeprom_read_byte((uint8_t *)pkt_index);
 
     /* If nth packet found, return */
     if(brick_word==pkt){
@@ -46,11 +46,11 @@ int16_t nth_pkt_by_type(uint16_t pkt, uint16_t f_index, uint16_t len, uint8_t n)
 
       /* Jump behind packet
        * packet_index currently on HRD_byte 2 */
-      pkt_index+= (uint16_t)(eeprom_read_byte(pkt_index+1) << 8) | (uint16_t)(eeprom_read_byte(pkt_index+2)) + 3;
+      pkt_index+= ((uint16_t)(eeprom_read_byte((uint8_t *)pkt_index+1) << 8) | (uint16_t)(eeprom_read_byte((uint8_t *)pkt_index+2))) + 3;
       /* Now right behind packet */
 
       /* init brick_word for next loop */
-      brick_word = (uint16_t)eeprom_read_byte(pkt_index);
+      brick_word = (uint16_t)eeprom_read_byte((uint8_t *)pkt_index);
     }
   }
 
@@ -75,12 +75,12 @@ int16_t nth_pkt_by_index(uint16_t f_index, uint16_t len, uint8_t n)
   }
 
   uint16_t pkt_index = f_index;
-  uint16_t brick_word = (uint16_t)eeprom_read_byte(pkt_index);
+  uint16_t brick_word = (uint16_t)eeprom_read_byte((uint8_t *)pkt_index);
 
   uint8_t i = 0; /* counts from 0 to n*/
 
   for(pkt_index+= 1;pkt_index<f_index+len;pkt_index++){
-    brick_word = (brick_word << 8) | (uint16_t)eeprom_read_byte(pkt_index);
+    brick_word = (brick_word << 8) | (uint16_t)eeprom_read_byte((uint8_t *)pkt_index);
 
     //printf ("%" PRId16, brick_word);
     //printf ("\n");
@@ -96,10 +96,10 @@ int16_t nth_pkt_by_index(uint16_t f_index, uint16_t len, uint8_t n)
       i++;
       if(i==n) break;
 
-      pkt_index+= (uint16_t)(eeprom_read_byte(pkt_index+1)) | (uint16_t)eeprom_read_byte(pkt_index+2) + 3;
+      pkt_index+= ((uint16_t)(eeprom_read_byte((uint8_t *)pkt_index+1)) | (uint16_t)eeprom_read_byte((uint8_t *)pkt_index+2)) + 3;
 
       /* init brick_word for next loop */
-      brick_word = (uint16_t)eeprom_read_byte(pkt_index);
+      brick_word = (uint16_t)eeprom_read_byte((uint8_t *)pkt_index);
     }
   }
 
@@ -121,10 +121,10 @@ int16_t brick_cont_len_without_prep(uint16_t cont_index)
 {
   /* get the length of a BRICK_CONT minus the BRICK_PREP len */
 
-  uint16_t brick_cont = (uint16_t)(eeprom_read_byte(cont_index) << 8) | (uint16_t)eeprom_read_byte(cont_index+1);
+  uint16_t brick_cont = (uint16_t)(eeprom_read_byte((uint8_t *)cont_index) << 8) | (uint16_t)eeprom_read_byte((uint8_t *)cont_index+1);
   if (brick_cont!=BRICK_CONT) return(-6);
 
-  uint16_t brick_cont_len = (uint16_t)(eeprom_read_byte(cont_index+2) << 8) | (uint16_t)eeprom_read_byte(cont_index+3);
+  uint16_t brick_cont_len = (uint16_t)(eeprom_read_byte((uint8_t *)cont_index+2) << 8) | (uint16_t)eeprom_read_byte((uint8_t *)cont_index+3);
 
   uint16_t l_index = cont_index + EEPROM_HDR_LEN + brick_cont_len;
 
@@ -142,7 +142,7 @@ int16_t brick_cont_len_without_prep(uint16_t cont_index)
 
     if(signed_prep_index>0){
       prep_index = (uint16_t)signed_prep_index;
-      prep_len = (uint16_t)(eeprom_read_byte(prep_index+2) << 8) | (uint16_t)eeprom_read_byte(prep_index+3);
+      prep_len = (uint16_t)(eeprom_read_byte((uint8_t *)prep_index+2) << 8) | (uint16_t)eeprom_read_byte((uint8_t *)prep_index+3);
       brick_cont_len -= (prep_len + EEPROM_HDR_LEN);
 
       prep_xedni = prep_index + EEPROM_HDR_LEN + prep_len;
@@ -159,13 +159,13 @@ int16_t brick_cont_len_without_prep(uint16_t cont_index)
 int16_t nth_subpkt_by_type(uint16_t pkt, uint16_t cont_index, uint8_t n)
 {
   return (nth_pkt_by_type(pkt, cont_index+EEPROM_HDR_LEN,
-    (uint16_t)(eeprom_read_byte(cont_index+2) << 8) | (uint16_t)eeprom_read_byte(cont_index+3), n));
+    (uint16_t)(eeprom_read_byte((uint8_t *)cont_index+2) << 8) | (uint16_t)eeprom_read_byte((uint8_t *)cont_index+3), n));
 }
 
 int16_t nth_subpkt_by_index(uint16_t cont_index, uint8_t n)
 {
   return (nth_pkt_by_index(cont_index+EEPROM_HDR_LEN,
-            (uint16_t)(eeprom_read_byte(cont_index+2) << 8) | (uint16_t)eeprom_read_byte(cont_index+3), n));
+            (uint16_t)(eeprom_read_byte((uint8_t *)cont_index+2) << 8) | (uint16_t)eeprom_read_byte((uint8_t *)cont_index+3), n));
 }
 
 /*----------------------------------------------------------*/

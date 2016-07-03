@@ -29,10 +29,10 @@ struct rdbuf_t {
 };
 
 
-void rdbuf_init (struct rdbuf_t *);
-uint8_t rdbuf_len(struct rdbuf_t *);
-int8_t rdbuf_push (struct rdbuf_t *, char val);
-int8_t rdbuf_pop (struct rdbuf_t *, char *val);
+void rdbuf_init (struct rdbuf_t *buf);
+uint16_t rdbuf_len(struct rdbuf_t *buf);
+int8_t rdbuf_push (struct rdbuf_t *buf, char val);
+int8_t rdbuf_pop (struct rdbuf_t *buf, char *val);
 int8_t rdbuf_reserve (struct rdbuf_t *buf, uint16_t count);
 int8_t rdbuf_fin_resv (struct rdbuf_t *buf);
 int8_t rdbuf_put_resv (struct rdbuf_t *buf, uint16_t pos, char val);

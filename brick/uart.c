@@ -154,7 +154,7 @@ ISR(TIMER1_OVF_vect)
    }
    else {
      /* Disable this interrupt */
-     TIMSK&= ~_BV(TOEI1);
+     TIMSK&= ~_BV(TOIE1);
 
      /* Stop timer */
      TCCR1= 0;
@@ -327,7 +327,7 @@ void communicate(void)
     /* TODO Wait for some random time */
 
     /*  Timer/Counter1 Overflow Interrupt Enable */
-    TIMSK|= _BV(TOEI1);
+    TIMSK|= _BV(TOIE1);
     /* start ping_rcvd timer */
     TCNT1= 0;
     TCCR1= PING_TMR_PRESCALE_REG;

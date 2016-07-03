@@ -3,6 +3,8 @@
   #include <avr/io.h>
   #include <avr/interrupt.h>
   #include <avr/pgmspace.h>
+  #include <avr/eeprom.h>
+
 
   #include <rdbuf.h>
   #include <pktpsr.h>
@@ -33,8 +35,8 @@ uint8_t init_brick_cont(){
     return (-1); /* No BRICK_CONT found */
   }
 
-  brick_cont.total_len = (uint16_t)(eeprom_read_byte(brick_cont.index+2) << 8)
-                          | (uint16_t)(eeprom_read_byte(brick_cont.index+3));
+  brick_cont.total_len = (uint16_t)(eeprom_read_byte((uint8_t *)brick_cont.index+2) << 8)
+                          | (uint16_t)(eeprom_read_byte((uint8_t *)brick_cont.index+3));
 
   /* Get BRICK_CONT length */
   int16_t signed_brick_cont_payload_len =
@@ -59,7 +61,7 @@ uint8_t make_aq()
 
   /* init */
   uint16_t pkt_index = brick_cont.index + EEPROM_HDR_LEN;
-  uint16_t brick_word = (uint16_t)eeprom_read_byte(pkt_index);
+  uint16_t brick_word = (uint16_t)eeprom_read_byte((uint8_t *)pkt_index);
   uint16_t resv_index = AQ_HDR_LEN + EEPROM_HDR_LEN;
 
 
@@ -68,17 +70,17 @@ uint8_t make_aq()
         pkt_index < brick_cont.index + EEPROM_HDR_LEN +  brick_cont.total_len;
         pkt_index++){
 
-    brick_word = (brick_word << 8) | (uint16_t)eeprom_read_byte(pkt_index);
+    brick_word = (brick_word << 8) | (uint16_t)eeprom_read_byte((uint8_t *)pkt_index);
 
     if(brick_word==BRICK_PREP){
 
       /* Skip the paket
        *     payload_length     HDR_restlenght */
-      pkt_index += (uint16_t)(eeprom_read_byte(pkt_index+1) << 8) +
-                     (uint16_t)(eeprom_read_byte(pkt_index+2)) + 3;
+      pkt_index += (uint16_t)(eeprom_read_byte((uint8_t *)pkt_index+1) << 8) +
+                     (uint16_t)(eeprom_read_byte((uint8_t *)pkt_index+2)) + 3;
 
       /* init brick_word for next loop */
-      brick_word = (uint16_t)eeprom_read_byte(pkt_index);;
+      brick_word = (uint16_t)eeprom_read_byte((uint8_t *)pkt_index);;
     }
     else {
       /* If not BRICK_PREP, put byte in buffer */
@@ -90,14 +92,14 @@ uint8_t make_aq()
 
   /* init */
   pkt_index = brick_cont.index + EEPROM_HDR_LEN;
-  brick_word = (uint16_t)eeprom_read_byte(pkt_index);
+  brick_word = (uint16_t)eeprom_read_byte((uint8_t *)pkt_index);
 
   /* run BRICK_PREP */
   for(pkt_index+=1;
          pkt_index < brick_cont.index + EEPROM_HDR_LEN + brick_cont.total_len;
          pkt_index++){
 
-    brick_word = (brick_word << 8) | (uint16_t)eeprom_read_byte(pkt_index);
+    brick_word = (brick_word << 8) | (uint16_t)eeprom_read_byte((uint8_t *)pkt_index);
 
     if(brick_word == BRICK_PREP){
       //rdbuf_put_resv(&uart.buf, pos, val);
@@ -106,11 +108,11 @@ uint8_t make_aq()
 
       /* Skip the paket
        *     payload_length     HDR_restlenght */
-       pkt_index += (uint16_t)(eeprom_read_byte(pkt_index+1) << 8) +
-                      (uint16_t)(eeprom_read_byte(pkt_index+2)) + 3;
+       pkt_index += (uint16_t)(eeprom_read_byte((uint8_t *)pkt_index+1) << 8) +
+                      (uint16_t)(eeprom_read_byte((uint8_t *)pkt_index+2)) + 3;
 
       /* init brick_word for next loop */
-      brick_word = (uint16_t)eeprom_read_byte(pkt_index);;
+      brick_word = (uint16_t)eeprom_read_byte((uint8_t *)pkt_index);;
     }
   }
 
@@ -121,7 +123,7 @@ uint8_t make_aq()
   rdbuf_put_resv(&uart.buf, 0, 0x0); /* AQ1 */
   rdbuf_put_resv(&uart.buf, 1, 0x1); /* AQ2 */
   uint16_t aq_len = brick_cont.len +
-  (uint16_t)(uart.hdr_rvcd[2] << 8) | (uint16_t)(uart.hdr_rvcd[3]); /* CKSUM in hdr_rvcd */
+  ((uint16_t)(uart.hdr_rvcd[2] << 8) | (uint16_t)(uart.hdr_rvcd[3])); /* CKSUM in hdr_rvcd */
   rdbuf_put_resv(&uart.buf, 2, (uint8_t)(8 >> aq_len));
   rdbuf_put_resv(&uart.buf, 3, (uint8_t)(aq_len&0xFF));
 
