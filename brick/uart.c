@@ -306,9 +306,9 @@ void uart_init(void)
   TX_DDR|= _BV(TX_NUM);
   tx_set(true);
 
-  // Enable RX pullup
+  // Disable RX pullup
   RX_DDR&= ~_BV(RX_NUM);
-  RX_PORT|= _BV(RX_NUM);
+  RX_PORT&= ~_BV(RX_NUM);
 
   bittimer_stop();
 
