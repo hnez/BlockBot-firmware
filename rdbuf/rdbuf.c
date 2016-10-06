@@ -5,7 +5,6 @@
 
 #include "rdbuf.h"
 
-
 void rdbuf_init (struct rdbuf_t *buf)
 {
   buf->rdpos= 0;
@@ -31,7 +30,6 @@ uint16_t rdbuf_len(struct rdbuf_t *buf)
 int8_t rdbuf_push (struct rdbuf_t *buf, char val)
 {
   if (buf->f.full) return (-1);
-
 
   buf->buf[buf->wrpos]= val;
 

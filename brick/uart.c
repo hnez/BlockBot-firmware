@@ -3,35 +3,43 @@
   #include <avr/io.h>
   #include <avr/interrupt.h>
   #include <avr/pgmspace.h>
-
+  #include <util/atomic.h>
 
   #include <rdbuf.h>
+  #include "leds.h"
 #endif
 
 #include "uart.h"
 
-#include <string.h> /* nessessary? */
-#define bzero(dst, size) memset(dst, 0, size)
+#include <string.h>
+#include <stdbool.h>
 
 #define BAUD_RATE 9600
 #define UART_BITTIME(bit) (((1+2*bit)*F_CPU)/(2L*BAUD_RATE*UA_TMR_PRESCALE_NUM))
 
 /* For ATtiny85 */
 #define TX_DDR  DDRB
+#define TX_PIN  PINB
 #define TX_PORT PORTB
-#define TX_NUM  PB4
+#define TX_NUM  PB1
 
 #define RX_DDR  DDRB
 #define RX_PIN  PINB
-#define RX_NUM  PB3
+#define RX_PORT PORTB
+#define RX_NUM  PB0
 
 #define UA_TMR_PRESCALE_REG (_BV(CS01) | _BV(CS00))
-#define UA_TMR_PRESCALE_NUM 64
-#define UA_BYTE_GAP_TIME UART_BITTIME(9) / 2 // About half a byte of delay
-
+#define UA_TMR_PRESCALE_NUM (64)
+#define UA_BYTE_GAP_TIME (UART_BITTIME(9) / 2) // About half a byte of delay
 
 #define PING_TMR_PRESCALE_REG (_BV(CS13) | _BV(CS11))
-#define PING_TMR_PRESCALE_NUM 512
+#define PING_TMR_PRESCALE_NUM (512)
+
+#define UA_BITN_START (0)
+#define UA_BITN_STOP (9)
+#define UA_BITN_DATA(s) (s+1)
+
+struct uart_t uart;
 
 // For F_CPU ATtiny clock and prescaler value of UA_TMR_PRESCALE_NUM
 const uint8_t uart_times[] PROGMEM= {
@@ -41,317 +49,268 @@ const uint8_t uart_times[] PROGMEM= {
   UART_BITTIME(9), // Stop bit
 };
 
+inline void tx_set(bool high)
+{
+  TX_PORT= (TX_PORT & ~_BV(TX_NUM)) | (high ? _BV(TX_NUM) : 0);
+}
 
-//Accepting a new transmission and continuing it
+inline bool rx_get(void)
+{
+  return((RX_PIN & _BV(RX_NUM)) != 0);
+}
+
+inline void bittimer_start(void)
+{
+  /* Shedule wakup for middle of received start bit.
+   * Timer/Counter0 Output Compare Match A Interrupt Enable
+   * Reset counter
+   * Start counter */
+  OCR0A= pgm_read_byte(&uart_times[0]);
+  TIMSK|= _BV(OCIE0A);
+  TCNT0= 0;
+  TCCR0B= UA_TMR_PRESCALE_REG;
+}
+
+inline void bittimer_stop(void)
+{
+  /* Disable interrupt
+   * and stop timer*/
+  TIMSK&= ~_BV(OCIE0A);
+  TCCR0B= 0;
+}
+
+inline void rx_interrupt_enable(void)
+{
+  // Pin Change Interrupt Enable for RX
+  PCMSK|= _BV(RX_NUM);
+  GIMSK|= _BV(PCIE);
+}
+
+inline void rx_interrupt_disable(void)
+{
+  GIMSK&= ~_BV(PCIE);
+}
+
+inline bool active_transmission(void)
+{
+  return (TIMSK & _BV(OCIE0A));
+}
+
+/**
+ * RX pin toggle interrupt
+ */
 ISR(PCINT0_vect)
 {
-  if (RX_PIN & _BV(RX_NUM)) {
-    /*
-     * Verify that pin is low.
-     * Search for #USBSerialConvertersSuck to find
-     * out why this is nessessary.
-     * Also upon startup the pin status might be unkown
-     */
+  if (rx_get()) {
+    // RX pin went high. This is not a start bit
 
     return;
   }
 
-  // Reset and start the bit timer
-  OCR0A= pgm_read_byte(&uart_times[0]);
-  TIMSK|= _BV(OCIE0A); /* Timer/Counter0 Output Compare Match A Interrupt Enable */
-  TCNT0= 0;
-  TCCR0B= UA_TMR_PRESCALE_REG; /* start timer */
+  /* Shedule wakup for middle of received start bit. */
+  bittimer_start();
 
-  // This is a dirty fix to make sure the stop bit
-  // is sent even if the sender is in a hurry and sends the
-  // next start bit a bit early #USBSerialConvertersSuck
-  TX_PORT|= _BV(TX_NUM);
+  /* Inform the bit time interrupt that this is the first
+   * bit in an uart datagram.
+   * And that it should be read. */
+  uart.bit_num= 0;
+  uart.clk_active= 0;
 
-  // Disable Pin change interrupts while the transmission
-  // is active
+  /* This is a dirty fix to make sure the stop bit (TX line high)
+   * is sent even if the sender is in a hurry and sends the
+   * next start bit a bit early */
+  tx_set(true);
+
+  /* Disable Pin change interrupts while the transmission
+   * is active (The RX line is read in the bit timer interrupt) */
   GIMSK&= ~_BV(PCIE);
-
-  if (!uart.flags.transmission) {
-    // This is not a byte expected by an active
-    // transmission. So start one
-    bzero(&uart.hdr_rvcd, sizeof(uart.hdr_rvcd));
-
-    uart.flags.transmission= 1;
-    uart.flags.active_clock= 0;
-    uart.flags.forward= 0;
-    uart.flags.backward= 1;
-    uart.flags.rcving_header= 1;
-
-    uart.rcvd_index= 0;
-
-    uart.bitnum= 0;
-    return;
-  }
-  // may check if aq later
-  else if (uart.rcvd_index== 1) {
-    // aq
-    if(uart.hdr_rvcd[0]==0x00 && uart.hdr_rvcd[1]==0x01) {
-      uart.flags.forward= 1;
-    }
-    //ping
-    else if(uart.hdr_rvcd[0]==0x00 && uart.hdr_rvcd[1]==0x02) {
-
-      uart.flags.ping_rcvd= 1;
-      TCCR0B= 0;
-
-      /* wait for aq */
-      GIMSK|= _BV(PCIE);
-      uart.flags.transmission= 0;
-    }
-  }
-  else if (uart.rcvd_index== 3) {
-    uart.passive_len = (uint16_t)(uart.hdr_rvcd[2] << 8)
-      | (uint16_t)uart.hdr_rvcd[3];
-  }
-
-  else if (uart.rcvd_index==5){
-    // assumes aq, may check cksum later
-    uart.flags.rcving_header= 0;
-  }
-
-  /* This should be the last PC interrupt. */
-  if (uart.rcvd_index==uart.passive_len + 2) {
-    uart.flags.active_clock= 1;
-  }
-
-  uart.rcvd_index++;
-  uart.bitnum= 0;
 }
 
-
-ISR(TIMER1_OVF_vect)
-{
-  /* time is over, there was no ping ->
-   * Starting a new transmission manual */
-   if (!uart.flags.ping_rcvd) {
-
-     /* starts make_aq */
-     uart.flags.first_brick= 1;
-
-     OCR0A= pgm_read_byte(&uart_times[0]);
-     TIMSK|= _BV(OCIE0A);
-     TCNT0= 0;
-     TCCR0B= UA_TMR_PRESCALE_REG;
-
-     /* Disable Pin change interrupts while the transmission
-      * is active */
-     GIMSK&= ~_BV(PCIE);
-
-     uart.flags.transmission= 1;
-     uart.flags.active_clock= 1;
-     uart.flags.forward= 1;
-     uart.flags.backward= 0;
-
-     uart.bitnum= 0;
-
-     /* make_aq() should start now, because
-      * uart.flags.first_brick && !uart.flags.aq_complete */
-   }
-   else {
-     /* Disable this interrupt */
-     TIMSK&= ~_BV(TOIE1);
-
-     /* Stop timer */
-     TCCR1= 0;
-   }
-}
-
-
+/**
+ * Uart bit timer compare interrupt.
+ */
 ISR(TIMER0_COMPA_vect)
 {
-  static uint8_t b_send, b_rcvd= 0x00; /* rcvd==received */
+  static struct {
+    uint8_t rx;
+    uint8_t tx;
+    uint8_t rx_en :1;
+    uint8_t tx_en :1;
+  } bbuf = { 0 };
 
-
-  if (uart.bitnum== 0) { // start bit
-    b_rcvd= 0x00;
-    //printf("b_rcvd: %X\n", (char)b_rcvd);
-
-    if (uart.flags.forward) {
-      // Load next buffer byte
-
-      int8_t bufstat= rdbuf_pop(&uart.buf, (char *) &b_send);
-
-
-      if (bufstat==BUFFER_EMPTY && uart.flags.active_clock) {
-        // The buffer ran empty
-        uart.flags.transmission= 0;
-        // Transmission complete
-        if(uart.hdr_rvcd[0]==0x0
-              && uart.hdr_rvcd[1]==0x1){
-                uart.flags.aq_complete= 1;
-        }
-        else { /* ping complete, continue */
-          GIMSK|= _BV(PCIE);
-        }
-
-      }
-      else if (bufstat==HIT_RESV) {
-        /* transmit nothing until
-         * resv is finished */
-        b_send= 0xFF;
-      }
-      else /* if (bufstat>0) */ {
-        // Forward the start bit if forwarding is requested
-        TX_PORT&= ~_BV(TX_NUM);
-      }
-    }
-  }
-
-  else if (uart.bitnum >= 9) { // stop bit
-    if (uart.flags.forward) {
-      // Forward the stop bit if forwarding is requested
-      TX_PORT|= _BV(TX_NUM);
-    }
-
-    /* Dont verify that a correct stop bit was received
-     * #USBSerialConvertersSuck */
-
-    if (uart.flags.backward) {
-      if (!uart.flags.rcving_header) {
-         /* The header is not meant for the buffer */
-
-        if (rdbuf_push(&uart.buf, b_rcvd) < 0) {
-          /* The buffer is full. Everything will break.
-           * This should not happen */
-           // panic();
-        }
-      }
-      else {
-        uart.hdr_rvcd[uart.rcvd_index]= b_rcvd;
-        if (uart.rcvd_index >= 5) {
-          uart.flags.rcving_header= 0;
-        }
-      }
-    }
-
-    if (uart.flags.active_clock) {
-      if (rdbuf_len(&uart.buf)>0) {
-
-        // Prepare interrupt for next cycle, compare match int is still enabled
-        OCR0A= pgm_read_byte(&uart_times[0]);
-
-        /* The counter will count up to 255, then wrap around
-         * to zero, reach uart_times[0] and start a new cycle */
-        TCNT0= 255 - UA_BYTE_GAP_TIME;
-
-        uart.bitnum= 0;
-      }
-      /* When everything is transfered */
-      else {
-        GIMSK|= _BV(PCIE); /* Enable Pin Change interrupt */
-        TCCR0B= 0; /* Stop timer */
-        /* There is no need to set anything else because everything
-           is set in the next Pin Change Interrupt */
-      }
+  if(uart.bit_num == UA_BITN_START) {
+    if(uart.cb_tx && uart.cb_tx(&bbuf.tx)) {
+      /* The user has a byte to send.
+       * Enable transmission*/
+      bbuf.tx_en= true;
     }
     else {
-      /* Disable Timer/Counter0 Output Compare Match A Interrupt */
-      TIMSK&= ~_BV(OCIE0A);
-    }
-  }
-  else { // data bit
-
-    if (uart.flags.backward) {
-      b_rcvd>>=1;
-
-      if (RX_PIN & _BV(RX_NUM)) {
-        // Sender sent a high bit
-        b_rcvd|= _BV(7);
-      }
-      //printf("b_rcvd: %x\n", b_rcvd);
+      /* No Byte to send.
+       * Disable transmission and leave active clocking mode
+       * if it was active */
+      bbuf.tx_en= false;
+      uart.clk_active= 0;
     }
 
-    if (uart.flags.forward) {
-      // Forward the data bit if forwarding is requested
-
-      if (b_send & 0x01) TX_PORT|=  _BV(TX_NUM);
-      else               TX_PORT&= ~_BV(TX_NUM);
-
-      b_send>>=1;
+    /* Check if there is a Start bit on the line
+     * and enable receiving when it is */
+    if(!rx_get()) {
+      bbuf.rx_en= true;
     }
 
-    if (uart.bitnum== 8 && !uart.flags.active_clock) {
-      /*
-       * #USBSerialConvertersSuck
-       * The sender might decide to send the next
-       * start bit while the receiver is still
-       * waiting for the stop bit.
-       * To deal with this case the pin change interrupt is
-       * re-enabled when the last data bit was received.
-       * It might trigger because of a transition from the
-       * last bit to the stop bit but that case should be filtered
-       * out by the line state check at the beginning of the interrupt
-       * handler
-       */
-
-      GIMSK|= _BV(PCIE);
+    /* Set the TX line low (e.g. send a start bit)
+     * if transmission is enabled.
+     * Set it high otherwise */
+    if (bbuf.tx_en) {
+      tx_set(false);
+    }
+    else {
+      tx_set(true);
     }
   }
 
-  // Shedule next bit
-  uart.bitnum++;
-  OCR0A= pgm_read_byte(&uart_times[uart.bitnum]);
+  if(uart.bit_num >= UA_BITN_DATA(0) &&
+     uart.bit_num <= UA_BITN_DATA(7)) {
+
+    if (bbuf.rx_en) {
+      /* Shift the bit on the RX line into the receive buffer.
+       * The bit is inserted as the most significant bit
+       * and shifted left in later iterations
+       * (least significant bit first) */
+      bbuf.rx= (bbuf.rx >> 1) & (rx_get() ? _BV(7) : 0);
+    }
+
+    /* Shift the least significant bit in the send buffer
+     * out onto the TX line. */
+    if (bbuf.tx_en) {
+      tx_set(bbuf.tx & 0x01);
+      bbuf.tx>>=1;
+    }
+  }
+
+  if((uart.clk_passive || uart.clk_active)
+     && uart.bit_num < UA_BITN_STOP) {
+
+    /* This is not the last bit in the UART Datagram.
+     * Shedule the next bit */
+    uart.bit_num++;
+    OCR0A= pgm_read_byte(&uart_times[uart.bit_num]);
+  }
+  else {
+    /* This is the last bit in the UART datagram.
+     * Decide if and how the next byte is sheduled */
+
+    /* Reset the bit counter so that on the
+     * next invocation the start bit will be transmitted. */
+    uart.bit_num= 0;
+
+    bittimer_stop();
+
+    /* The byte we might have read is not valid when
+     * There is no stop bit (rx high) on the line.
+     * Or the clocking mode is in a disabled state.
+     * Unsetting rx_en discards the byte. */
+    if (rx_get() || !(uart.clk_passive || uart.clk_active)) {
+      bbuf.rx_en= false;
+    }
+
+    /* Send the stop bit */
+    if (bbuf.tx_en) {
+      tx_set(true);
+    }
+
+    /* Check if the user wants the byte we read */
+    if(!bbuf.rx_en || !uart.cb_rx || !uart.cb_rx(bbuf.rx)) {
+      uart.clk_passive= 0;
+    }
+
+    if(uart.clk_active && !uart.clk_passive) {
+      /* Active clocking selected.
+       * We are responsible to shedule the next byte*/
+
+      /* Use the 8 bit overflow to wait for
+       * UA_BYTE_GAP_TIME + uart_times[0]
+       * timer ticks before starting the next byte*/
+      TCNT0= 0xff - UA_BYTE_GAP_TIME;
+      OCR0A= pgm_read_byte(&uart_times[0]);
+
+      /* Enable this interrupt
+       * Start the timer */
+      TIMSK|= _BV(OCIE0A);
+      TCCR0B= UA_TMR_PRESCALE_REG;
+    }
+
+    if(uart.clk_passive && !uart.clk_active) {
+      /* Passive clocking selected.
+       * The master is responsible to shedule the next byte*/
+
+      /* Enable interrupt that waits for next start bit */
+      rx_interrupt_enable();
+    }
+  }
+
 }
 
+/**
+ * Start transmitting
+ */
+void uart_start_active(void)
+{
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    uart.clk_active= 1;
+    uart.clk_passive= 0;
 
+    /* Only start if no transmission is active */
+    if (!active_transmission()) {
+      /* Shedule wakup for middle of received start bit. */
+      bittimer_start();
+    }
+  }
+}
 
+/**
+ * Start waiting for a master
+ * to start a transmission
+ */
+void uart_start_passive(void)
+{
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    uart.clk_active= 0;
+    uart.clk_passive= 1;
+
+    /* Only start if no transmission is active */
+    if (!active_transmission()) {
+      rx_interrupt_enable();
+    }
+  }
+}
+
+/**
+ * Disable uart.
+ * If a byte is being tranmitted right now
+ * it will be completed before the uart is disabled.
+ */
+void uart_disabled_mode(void)
+{
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    uart.clk_active= 0;
+    uart.clk_passive= 0;
+
+    rx_interrupt_disable();
+  }
+}
 
 void uart_init(void)
 {
-  uart.flags.transmission= 0;
-  uart.flags.ping_rcvd= 0;
-  uart.flags.first_brick= 0;
-  uart.flags.aq_complete= 0;
-
   // Set TX pin to driven high state
-  TX_PORT&= ~_BV(TX_NUM);
   TX_DDR|= _BV(TX_NUM);
+  tx_set(true);
 
-  /* Pin Change Interrupt Enable */
-  PCMSK|= _BV(RX_NUM);
-  GIMSK|= _BV(PCIE);
+  // Enable RX pullup
+  RX_DDR&= ~_BV(RX_NUM);
+  RX_PORT|= _BV(RX_NUM);
 
-}
+  bittimer_stop();
 
-void communicate(void)
-{
-
-  /* Buffer should be empty */
-  if (rdbuf_len(&uart.buf)==0 && !uart.flags.transmission){
-
-    /* TODO Wait for some random time */
-
-    /*  Timer/Counter1 Overflow Interrupt Enable */
-    TIMSK|= _BV(TOIE1);
-    /* start ping_rcvd timer */
-    TCNT1= 0;
-    TCCR1= PING_TMR_PRESCALE_REG;
-
-    /* ping */
-    rdbuf_push(&uart.buf, 0x00);
-    rdbuf_push(&uart.buf, 0x02);
-
-    /* Send ping */
-    OCR0A= pgm_read_byte(&uart_times[0]);
-    TIMSK|= _BV(OCIE0A);
-    TCNT0= 0;
-    TCCR0B= UA_TMR_PRESCALE_REG;
-
-    /* Disable Pin change interrupts while the transmission
-     * is active */
-    GIMSK&= ~_BV(PCIE);
-
-    uart.flags.transmission= 1;
-    uart.flags.active_clock= 1;
-    uart.flags.forward= 1;
-    uart.flags.backward= 0;
-
-    uart.bitnum= 0;
-
-  } /* else there will be no ping */
+  uart_disabled_mode();
 }
