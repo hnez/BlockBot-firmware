@@ -1,6 +1,8 @@
 PROGNAME= brick
 CPU= attiny85
 FREQ= 8000000
+FUSES= -U efuse:w:0xFF:m -U hfuse:w:0xDF:m -U lfuse:w:0xE2:m
+
 SOURCES= $(PROGNAME).c uart.c
 CFLAGS+= -I../rdbuf
 CFLAGS+= -L../rdbuf
@@ -11,7 +13,7 @@ LIBS+= -lpktpsr.$(CPU)-$(FREQ)
 ATGTS+= librdbuf.$(CPU)-$(FREQ).a
 ATGTS+= libpktpsr.$(CPU)-$(FREQ).a
 
-FLASHDEV?= -c stk500v1 -b 19200 -P /dev/ttyUSB0
+FLASHDEV?= -c usbasp
 
 include ../Makefile.include
 
