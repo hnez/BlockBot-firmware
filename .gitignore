@@ -7,3 +7,4 @@ __pycache__
 *.bc
 *.a
 *.test
+/brick/brick_binary.*

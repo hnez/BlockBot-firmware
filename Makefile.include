@@ -60,4 +60,4 @@ tests: $(TEST_TGT)
 	@echo "#define $(*)_size ((int)$(*)_size_sym)" >> $(*).h
 
 %.elf : $(OBJECTS)
-	$(CC) $(AVRCFLAGS) $(CFLAGS) -o $@ $(OBJECTS) $(LIBS)
+	$(CC) $(AVRCFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJECTS) $(LIBS)
