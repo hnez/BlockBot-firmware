@@ -10,7 +10,7 @@ FLASHFLAGS+= -p $(CPU) -e $(FLASHDEV)
 AVRCFLAGS+= -mmcu=$(CPU) -DF_CPU=$(FREQ)L -fno-caller-saves -static
 CFLAGS+= -ffunction-sections -fdata-sections \
          -Os -Wall -Wextra -pedantic -Werror -Wshadow -Wstrict-overflow \
-         -fno-strict-aliasing -std=c11
+         -fno-strict-aliasing -std=gnu11
 
 TEST_SRC+= $(wildcard tests/*.c)
 TEST_TGT= $(patsubst %.c, %.test, $(TEST_SRC))

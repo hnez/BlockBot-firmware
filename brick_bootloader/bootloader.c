@@ -26,7 +26,7 @@ struct {
 
 void(*restart)(void)= NULL;
 
-void page_write(void)
+static inline void page_write(void)
 {
   uint16_t base_addr= pkg_buf.page_num * SPM_PAGESIZE;
 
@@ -44,7 +44,7 @@ void page_write(void)
   boot_spm_busy_wait();
 }
 
-void page_read(void)
+static inline void page_read(void)
 {
   uint16_t base_addr= pkg_buf.page_num * SPM_PAGESIZE;
 
@@ -56,12 +56,12 @@ void page_read(void)
   }
 }
 
-void led_setup(void)
+static inline void led_setup(void)
 {
   DDRB= _BV(PB3) | _BV(PB4);
 }
 
-void led_notify(void)
+static inline void led_notify(void)
 {
   PORTB= _BV(PB4);
   _delay_ms(50);
@@ -75,7 +75,7 @@ void led_notify(void)
   PORTB= 0;
 }
 
-void uart_rcv(void)
+static inline void uart_rcv(void)
 {
   uint8_t *buf= (void*)&pkg_buf;
   uint8_t byte= 0;
@@ -97,7 +97,7 @@ void uart_rcv(void)
   }
 }
 
-void uart_send(void)
+static inline void uart_send(void)
 {
   uint8_t *buf= (void*)&pkg_buf;
   uint8_t byte;
@@ -127,10 +127,27 @@ void uart_send(void)
   }
 }
 
-void uart_init(void)
+static inline void uart_init(void)
 {
   TX_DDR|= _BV(TX_NUM);
   TX_PORT|= _BV(TX_NUM);
+}
+
+/*
+ * Do the minimal necessarry setup before executing main.
+ * (Setup stack pointer, clear zero register)
+ */
+__attribute__((naked)) __attribute__((section (".init9"))) void pre_main (void)
+{
+  register uint8_t spl= RAMEND & 0xff;
+  register uint8_t sph= RAMEND>>8;
+
+  asm volatile("out __SP_L__, %0\n"
+               "out __SP_H__, %1\n"
+               :: "r" (spl), "r" (sph));
+
+  asm volatile ( "clr __zero_reg__" );
+  asm volatile ( "rjmp main");
 }
 
 /*
@@ -139,7 +156,7 @@ void uart_init(void)
  * NOP sled that leads into the bootloader
  * section.
  */
-int main(void)
+__attribute__((OS_main))int main(void)
 {
   led_setup();
   led_notify();
@@ -147,9 +164,6 @@ int main(void)
 
   while(pkg_buf.op != OP_RESTART) {
     uart_rcv();
-
-    //    if (pkg_buf.op != '')  PORTB|= _BV(PB4);
-    if (pkg_buf.op == 'U')  PORTB|= _BV(PB3);
 
     if (pkg_buf.op == OP_WRITE) {
       page_write();
@@ -163,6 +177,4 @@ int main(void)
   }
 
   restart();
-
-  return(0);
 }
