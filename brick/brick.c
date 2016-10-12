@@ -4,46 +4,82 @@
   #include <avr/interrupt.h>
   #include <avr/pgmspace.h>
   #include <avr/eeprom.h>
+  #include <avr/sleep.h>
 
   #include <util/delay.h>
 
   #include "leds.h"
   #include "uart.h"
+  #include "brick_binary.h"
 #endif
 
-char ans='\0';
+int tx_pos= 0;
 
-bool gibberish_tx(uint8_t *bte)
+bool binary_transmit(uint8_t *out_b)
 {
-  *bte= ans;
+  if (tx_pos < brick_binary_size) {
+    *out_b= pgm_read_byte(&brick_binary[tx_pos]);
+    tx_pos++;
 
-  return(true);
+    return(true);
+  }
+  else {
+    return(false);
+  }
 }
 
-bool rcv_cb(uint8_t bte)
+void main_master(void)
 {
-  ans= bte;
+  tx_pos= 0;
+  uart.cb_tx= binary_transmit;
 
-  return(true);
+  uart_start_active();
+  sei();
+
+  for(;;) {
+    sleep_mode();
+
+    led_toggle(2);
+  }
+}
+
+void main_slave(void)
+{
+  led_set(1, true);
+
+}
+
+void startup_notify(void)
+{
+  led_set(1, true);
+  _delay_ms(100);
+
+  led_set(1, false);
+  _delay_ms(200);
+
+  led_set(1, true);
+  _delay_ms(100);
+
+  led_set(1, false);
 }
 
 int main (void)
 {
   led_init();
-  led_set(1, true);
 
   uart_init();
-  uart.cb_tx= gibberish_tx;
-  uart.cb_rx= rcv_cb;
 
-  uart_start_passive();
+  /* Waste some time blinking the LED
+   * to let the signal lines settle */
+  startup_notify();
 
-  sei();
+  set_sleep_mode(SLEEP_MODE_IDLE);
 
-  for(;;) {
-
-
-    _delay_ms(500);
+  if(uart_carrier_detect()) {
+    main_slave();
+  }
+  else {
+    main_master();
   }
 
   return (0);

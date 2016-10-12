@@ -27,4 +27,4 @@ void uart_init(void);
 void uart_start_active(void);
 void uart_start_passive(void);
 void uart_disabled_mode(void);
-
+bool uart_carrier_detect(void);

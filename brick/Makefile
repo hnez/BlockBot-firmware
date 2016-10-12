@@ -12,6 +12,7 @@ LIBS+= -lrdbuf.$(CPU)-$(FREQ)
 LIBS+= -lpktpsr.$(CPU)-$(FREQ)
 ATGTS+= librdbuf.$(CPU)-$(FREQ).a
 ATGTS+= libpktpsr.$(CPU)-$(FREQ).a
+OBJECTS+= brick_binary.o
 
 FLASHDEV?= -c usbasp
 
@@ -19,7 +20,7 @@ include ../Makefile.include
 
 .PHONY: librdbuf.$(CPU)-$(FREQ).a
 .PHONY: libpktpsr.$(CPU)-$(FREQ).a
-librdbuf.$(CPU)-$(FREQ).a :
+librdbuf.$(CPU)-$(FREQ).a:
 	make -C ../rdbuf CPU=$(CPU) FREQ=$(FREQ)
-libpktpsr.$(CPU)-$(FREQ).a :
+libpktpsr.$(CPU)-$(FREQ).a:
 	make -C ../pktpsr CPU=$(CPU) FREQ=$(FREQ)

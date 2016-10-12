@@ -299,6 +299,15 @@ void uart_disabled_mode(void)
   }
 }
 
+/**
+ * Check if a device is attached to
+ * the RX line
+ */
+bool uart_carrier_detect(void)
+{
+  return(rx_get());
+}
+
 void uart_init(void)
 {
   // Set TX pin to driven high state
@@ -309,6 +318,8 @@ void uart_init(void)
   RX_DDR&= ~_BV(RX_NUM);
   RX_PORT&= ~_BV(RX_NUM);
 
+  memset(&uart, 0, sizeof(uart));
+  
   bittimer_stop();
 
   uart_disabled_mode();
