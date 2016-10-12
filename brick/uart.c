@@ -6,7 +6,6 @@
   #include <util/atomic.h>
 
   #include <rdbuf.h>
-  #include "leds.h"
 #endif
 
 #include "uart.h"
@@ -177,7 +176,7 @@ ISR(TIMER0_COMPA_vect)
        * The bit is inserted as the most significant bit
        * and shifted left in later iterations
        * (least significant bit first) */
-      bbuf.rx= (bbuf.rx >> 1) & (rx_get() ? _BV(7) : 0);
+      bbuf.rx= (bbuf.rx >> 1) | (rx_get() ? _BV(7) : 0);
     }
 
     /* Shift the least significant bit in the send buffer
@@ -210,7 +209,7 @@ ISR(TIMER0_COMPA_vect)
      * There is no stop bit (rx high) on the line.
      * Or the clocking mode is in a disabled state.
      * Unsetting rx_en discards the byte. */
-    if (rx_get() || !(uart.clk_passive || uart.clk_active)) {
+    if (!rx_get() || !(uart.clk_passive || uart.clk_active)) {
       bbuf.rx_en= false;
     }
 

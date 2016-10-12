@@ -11,28 +11,20 @@
   #include "uart.h"
 #endif
 
-char *gibberish = "Lol was los bei dir Junge?";
+char ans='\0';
 
 bool gibberish_tx(uint8_t *bte)
 {
-  static size_t pos=0;
-  static bool led_stat=false;
+  *bte= ans;
 
-  led_set(2, led_stat);
-  led_stat= !led_stat;
+  return(true);
+}
 
-  if(gibberish[pos]) {
-    *bte=gibberish[pos];
+bool rcv_cb(uint8_t bte)
+{
+  ans= bte;
 
-    pos++;
-
-    return(true);
-  }
-  else {
-    pos= 0;
-
-    return(false);
-  }
+  return(true);
 }
 
 int main (void)
@@ -42,11 +34,14 @@ int main (void)
 
   uart_init();
   uart.cb_tx= gibberish_tx;
+  uart.cb_rx= rcv_cb;
+
+  uart_start_passive();
 
   sei();
 
   for(;;) {
-    uart_start_active();
+
 
     _delay_ms(500);
   }
