@@ -5,6 +5,7 @@
   #include <avr/pgmspace.h>
   #include <avr/eeprom.h>
   #include <avr/sleep.h>
+  #include <avr/wdt.h>
 
   #include <util/delay.h>
 
@@ -63,14 +64,32 @@ void startup_notify(void)
   led_set(1, false);
 }
 
+inline void bootloader_cleanup(void)
+{
+  cli();
+  PORTB= 0;
+  MCUSR= 0;
+  WDTCR = (1<<WDCE)|(1<<WDE);
+  WDTCR = 0;
+}
+
 int main (void)
 {
+  bootloader_cleanup();
+
   led_init();
 
-  uart_init();
+  for(;;) {
+    _delay_ms(100);
+
+    led_toggle(1);
+  }
+
+  //uart_init();
 
   /* Waste some time blinking the LED
    * to let the signal lines settle */
+  /*
   startup_notify();
 
   set_sleep_mode(SLEEP_MODE_IDLE);
@@ -81,6 +100,7 @@ int main (void)
   else {
     main_master();
   }
+  */
 
   return (0);
 }

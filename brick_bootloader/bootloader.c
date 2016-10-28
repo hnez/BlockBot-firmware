@@ -2,6 +2,11 @@
 #include <avr/boot.h>
 #include <avr/pgmspace.h>
 #include <util/delay.h>
+#include <avr/wdt.h>
+#include <avr/interrupt.h>
+
+#define BOOTLOADER_VERSION 1
+#define STARTUP_TIMEOUT_US (50000)
 
 #define TX_DDR  DDRB
 #define TX_PIN  PINB
@@ -15,14 +20,12 @@
 
 #define OP_NOP 0
 #define OP_ENUMERATE 1
-#define OP_WRITE 2
-#define OP_READ 3
-#define OP_RESTART 4
+#define OP_DEVINFO 2
+#define OP_WRITE 3
+#define OP_READ 4
 
 #define BITTIME (104)
 #define BITTIME_HALF (BITTIME/2)
-
-#define AVR_RJMP(pos, dst) (0xc000 | (((dst)-(pos)-1)&0x0fff))
 
 struct {
   uint8_t addr;
@@ -31,7 +34,7 @@ struct {
   uint8_t data[SPM_PAGESIZE];
 } pkg_buf;
 
-void(*restart)(void)= (void(*)(void))(0x5e/2);
+void(*restart)(void)= (void(*)(void))(WDT_vect_num-1);
 
 /*
  * Do the minimal necessarry setup before executing main.
@@ -62,10 +65,6 @@ static inline void page_write(void)
 
     uint16_t pgw= pkg_buf.data[i];
 
-    if(rel_addr == 0){
-      pgw= AVR_RJMP(0, (uint16_t)pre_main);
-    }
-
     pgw|= pkg_buf.data[i+1] << 8;
 
     boot_page_fill(rel_addr, pgw);
@@ -87,23 +86,17 @@ static inline void page_read(void)
   }
 }
 
-static inline void led_setup(void)
+static inline void dev_info(void)
 {
-  DDRB= _BV(PB3) | _BV(PB4);
-}
+  pkg_buf.data[0]= BOOTLOADER_VERSION;
 
-static inline void led_notify(void)
-{
-  PORTB= _BV(PB4);
-  _delay_ms(50);
+  pkg_buf.data[8]= SIGNATURE_0;
+  pkg_buf.data[9]= SIGNATURE_1;
+  pkg_buf.data[10]= SIGNATURE_2;
 
-  PORTB= 0;
-  _delay_ms(100);
-
-  PORTB= _BV(PB4);
-  _delay_ms(50);
-
-  PORTB= 0;
+  uint16_t bl_addr= (uint16_t)pre_main;
+  pkg_buf.data[16]= bl_addr & 0xff;
+  pkg_buf.data[17]= bl_addr >> 8;
 }
 
 static inline void uart_recv(void)
@@ -112,7 +105,7 @@ static inline void uart_recv(void)
     uint8_t byte= 0;
 
     // Wait for falling edge of start bit
-    loop_until_bit_is_clear(RX_PIN, RX_NUM);
+    while(bit_is_set(RX_PIN, RX_NUM));
 
     // Skip start bit
     _delay_us(BITTIME + BITTIME_HALF);
@@ -149,10 +142,23 @@ static inline void uart_send(void)
   }
 }
 
-static inline void uart_init(void)
+static inline void pin_init(void)
 {
-  TX_DDR|= _BV(TX_NUM);
-  TX_PORT|= _BV(TX_NUM);
+  DDRB= _BV(TX_NUM);
+  TX_PORT= _BV(TX_NUM);
+}
+
+/*
+ * Setup the watchdog to trigger after one second.
+ * The watchdog interrupt vector is set to the
+ * main programs start address.
+ */
+static inline void wdt_init(void)
+{
+  cli();
+  WDTCR |= _BV(WDCE) | _BV(WDE);
+  WDTCR= _BV(WDIE) | _BV(WDE) | _BV(WDP2) | _BV(WDP1);
+  sei();
 }
 
 /*
@@ -161,20 +167,25 @@ static inline void uart_init(void)
  * NOP sled that leads into the bootloader
  * section.
  */
-__attribute__((OS_main))int main(void)
+__attribute__((OS_main)) int main(void)
 {
-  led_setup();
-  led_notify();
-  uart_init();
-
   uint8_t addr= 0;
 
-  while(pkg_buf.op != OP_RESTART) {
+  pin_init();
+  wdt_init();
+
+  for(;;) {
     uart_recv();
+
+    wdt_reset();
 
     if (pkg_buf.addr == addr) {
       if (pkg_buf.op == OP_ENUMERATE) {
         addr= ++pkg_buf.data[0];
+      }
+
+      if (pkg_buf.op == OP_DEVINFO) {
+        dev_info();
       }
 
       if (pkg_buf.op == OP_WRITE) {
@@ -188,6 +199,4 @@ __attribute__((OS_main))int main(void)
 
     uart_send();
   }
-
-  restart();
 }
