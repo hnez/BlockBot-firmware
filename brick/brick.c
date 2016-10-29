@@ -79,10 +79,13 @@ int main (void)
 
   led_init();
 
+  led_toggle(2);
+  
   for(;;) {
     _delay_ms(100);
 
     led_toggle(1);
+    led_toggle(2);
   }
 
   //uart_init();

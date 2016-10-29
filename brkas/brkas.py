@@ -21,7 +21,7 @@
 
 # This software started out to be a clean and modular assembler
 # but ended up being quite the opposite
-# (a unclean and hackish dissassembler).
+# (an unclean and hackish dissassembler).
 # Some work would be required to get it into a nice shape,
 # work like making this not the only comment in the whole sourcecode.
 # But the assembler and disassembler work for now and features can

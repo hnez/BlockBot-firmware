@@ -1,5 +1,24 @@
 #!/usr/bin/env python3
 
+'''
+    Copyright 2016 Leonard Göhrs
+
+    This file is part of Chain flasher.
+
+    Chain flasher is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Chain flasher is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Chain flasher.  If not, see <http://www.gnu.org/licenses/>.
+'''
+
 import serial
 import struct
 import time
@@ -156,7 +175,7 @@ class Flasher(object):
         self.port= port
         self.ser= serial.Serial(port, 9600)
 
-        time.sleep(0.2)
+        self.reset()
 
         self.ser.reset_input_buffer()
 
@@ -166,6 +185,15 @@ class Flasher(object):
 
         for addr in range(1, chain_len+1):
             self.bricks.append(Brick(self, addr))
+
+    def reset(self):
+        self.ser.dtr= True
+
+        time.sleep(5)
+
+        self.ser.dtr= False
+
+        time.sleep(0.5)
 
     def xfer_pkg(self, addr, op, page_num=0, data=None):
         if data is None:
